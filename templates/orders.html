@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Pesanan & Bukti Bayar{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="text-white fw-bold mb-0">Pesanan & Verifikasi Pembayaran</h4>
+    <p class="text-secondary mb-0" style="font-size:0.85rem;">{{ orders|length }} total transaksi dari pembeli</p>
+  </div>
+</div>
+
+<div class="content-card">
+  <table class="table table-hover mb-0">
+    <thead>
+      <tr>
+        <th>ID & Tanggal</th>
+        <th>Total Harga</th>
+        <th>Alamat Pengiriman</th>
+        <th>Bukti Bayar</th>
+        <th>Status</th>
+        <th class="text-center">Ubah Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for order in orders %}
+      <tr>
+        <td>
+          <div style="font-size:0.75rem; color:#aaa; font-family:monospace;">{{ order.id[:18] }}...</div>
+          <div style="font-size:0.75rem; color:#555;">{{ order.created_at[:10] if order.created_at else '-' }}</div>
+        </td>
+        <td class="fw-bold text-white">Rp {{ "{:,.0f}".format(order.total_harga or 0) }}</td>
+        <td style="max-width:200px; color:#888; font-size:0.82rem;">{{ order.alamat }}</td>
+        <td>
+          {% if order.proof_image_url %}
+            <a href="{{ order.proof_image_url }}" target="_blank"
+              class="btn btn-outline-info btn-sm rounded-3" style="font-size:0.78rem;">
+              <i class="bi bi-image me-1"></i>Cek Foto
+            </a>
+          {% else %}
+            <span style="color:#444; font-size:0.8rem;">Tidak ada</span>
+          {% endif %}
+        </td>
+        <td>
+          {% set s = order.status %}
+          <span class="badge-status
+            {% if s == 'Pending' %}badge-pending
+            {% elif s == 'Diproses' %}badge-diproses
+            {% elif s == 'Dikirim' %}badge-dikirim
+            {% else %}badge-selesai{% endif %}">{{ s }}</span>
+        </td>
+        <td class="text-center">
+          <form method="POST" action="{{ url_for('update_order_status', order_id=order.id) }}" class="d-flex gap-2 justify-content-center">
+            <select name="status" class="form-select form-select-sm rounded-3"
+              style="background:#222; border-color:#333; color:#fff; font-size:0.8rem; width:130px;">
+              {% for status in ['Pending', 'Diproses', 'Dikirim', 'Selesai'] %}
+                <option value="{{ status }}" {{ 'selected' if order.status == status else '' }}>{{ status }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-light btn-sm rounded-3 px-3 fw-bold" style="font-size:0.78rem;">
+              Update
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-secondary py-5">
+        <i class="bi bi-receipt-cutoff" style="font-size:2rem;"></i>
+        <div class="mt-2">Belum ada pesanan dari pembeli.</div>
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

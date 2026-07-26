@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ action }} Produk{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="{{ url_for('products') }}" class="text-secondary text-decoration-none" style="font-size:0.85rem;">
+    <i class="bi bi-arrow-left me-1"></i>Kembali ke Daftar Produk
+  </a>
+  <h4 class="text-white fw-bold mt-2 mb-0">{{ action }} Produk</h4>
+</div>
+
+<div class="content-card p-4" style="max-width:640px;">
+  <form method="POST">
+    <div class="row g-4">
+      <div class="col-12">
+        <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">NAMA PRODUK *</label>
+        <input type="text" name="name" class="form-control" required
+          value="{{ product.name if product else '' }}"
+          placeholder="Contoh: CHMB Heavyweight Oversized Tee">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">HARGA (Rp) *</label>
+        <input type="number" name="price" class="form-control" required min="0" step="1000"
+          value="{{ product.price if product else '' }}"
+          placeholder="150000">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">KATEGORI *</label>
+        <select name="category" class="form-control" required>
+          {% for cat in ['T-Shirt', 'Hoodie', 'Pants'] %}
+            <option value="{{ cat }}"
+              {{ 'selected' if product and product.category == cat else '' }}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">URL GAMBAR PRODUK</label>
+        <input type="url" name="image_url" class="form-control"
+          value="{{ product.image_url if product else '' }}"
+          placeholder="https://images.unsplash.com/photo-...">
+        <div class="form-text" style="color:#555;">Tempelkan link URL gambar produk (bisa dari Unsplash, Google Photos, dll)</div>
+      </div>
+      <div class="col-12">
+        <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">DESKRIPSI PRODUK</label>
+        <textarea name="description" class="form-control" rows="4"
+          placeholder="Deskripsi detail produk baju CHMB...">{{ product.description if product else '' }}</textarea>
+      </div>
+      <div class="col-12 d-flex gap-3">
+        <button type="submit" class="btn btn-light fw-bold px-4 rounded-3">
+          <i class="bi bi-check-lg me-1"></i>{{ action }} Produk
+        </button>
+        <a href="{{ url_for('products') }}" class="btn btn-outline-secondary rounded-3">Batal</a>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

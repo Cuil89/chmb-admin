@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Overview{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="text-white fw-bold mb-0">Dashboard Overview</h4>
+    <p class="text-secondary mb-0" style="font-size:0.85rem;">Real-time data dari Supabase Database</p>
+  </div>
+  <a href="{{ url_for('products') }}" class="btn btn-light btn-sm fw-bold rounded-3">
+    <i class="bi bi-plus me-1"></i>Tambah Produk
+  </a>
+</div>
+
+<!-- Stat Cards -->
+<div class="row g-4 mb-4">
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="stat-label mb-2">Total Pendapatan</div>
+          <div class="stat-value">Rp {{ "{:,.0f}".format(total_revenue) }}</div>
+        </div>
+        <div class="stat-icon" style="background:rgba(25,135,84,0.15); color:#198754;">
+          <i class="bi bi-cash-stack"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="stat-label mb-2">Total Pesanan</div>
+          <div class="stat-value">{{ total_orders }}</div>
+        </div>
+        <div class="stat-icon" style="background:rgba(13,202,240,0.15); color:#0dcaf0;">
+          <i class="bi bi-bag-check"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="stat-label mb-2">Total Produk</div>
+          <div class="stat-value">{{ total_products }}</div>
+        </div>
+        <div class="stat-icon" style="background:rgba(255,193,7,0.15); color:#ffc107;">
+          <i class="bi bi-bag"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="stat-label mb-2">Belum Diverifikasi</div>
+          <div class="stat-value text-warning">{{ pending_count }}</div>
+        </div>
+        <div class="stat-icon" style="background:rgba(220,53,69,0.15); color:#dc3545;">
+          <i class="bi bi-exclamation-circle"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Orders Table -->
+<div class="content-card p-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h6 class="text-white fw-bold mb-0"><i class="bi bi-clock-history me-2"></i>Pesanan Terbaru</h6>
+    <a href="{{ url_for('orders') }}" class="btn btn-outline-secondary btn-sm rounded-3">Lihat Semua</a>
+  </div>
+  <table class="table table-hover mb-0">
+    <thead>
+      <tr>
+        <th>ID Transaksi</th>
+        <th>Total Harga</th>
+        <th>Alamat</th>
+        <th>Status</th>
+        <th>Tanggal</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for order in recent_orders %}
+      <tr>
+        <td><code style="color:#aaa; font-size:0.8rem;">{{ order.id[:20] }}...</code></td>
+        <td class="fw-bold text-white">Rp {{ "{:,.0f}".format(order.total_harga or 0) }}</td>
+        <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#888;">{{ order.alamat }}</td>
+        <td>
+          {% set s = order.status %}
+          <span class="badge-status
+            {% if s == 'Pending' %}badge-pending
+            {% elif s == 'Diproses' %}badge-diproses
+            {% elif s == 'Dikirim' %}badge-dikirim
+            {% else %}badge-selesai{% endif %}">{{ s }}</span>
+        </td>
+        <td style="color:#666; font-size:0.8rem;">{{ order.created_at[:10] if order.created_at else '-' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-center text-secondary py-4">Belum ada transaksi</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
