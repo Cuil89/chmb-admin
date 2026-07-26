@@ -1,13 +1,42 @@
+import os
+import requests as req
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from supabase import create_client, Client
-from config import SUPABASE_URL, SUPABASE_KEY, ADMIN_USERNAME, ADMIN_PASSWORD, SECRET_KEY
 from functools import wraps
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = SECRET_KEY
+app.secret_key = os.environ.get("SECRET_KEY", "chmb-secret-flask-key-2026")
 
-# Inisialisasi Supabase client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ubisgngdfdrhdnclfnln.supabase.co")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_publishable_4Hz3bB3u3Kw1kkzboMDhmA_OKL6shMi")
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "chmb2026")
+
+HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=representation",
+}
+
+# ─── Helper Supabase REST ─────────────────────────────────────────────────────
+def sb_get(table, params=None):
+    r = req.get(f"{SUPABASE_URL}/rest/v1/{table}", headers=HEADERS, params=params)
+    return r.json() if r.ok else []
+
+def sb_insert(table, data):
+    r = req.post(f"{SUPABASE_URL}/rest/v1/{table}", headers=HEADERS, json=data)
+    return r.ok, r.text
+
+def sb_update(table, match_col, match_val, data):
+    r = req.patch(f"{SUPABASE_URL}/rest/v1/{table}?{match_col}=eq.{match_val}", headers=HEADERS, json=data)
+    return r.ok, r.text
+
+def sb_delete(table, match_col, match_val):
+    r = req.delete(f"{SUPABASE_URL}/rest/v1/{table}?{match_col}=eq.{match_val}", headers=HEADERS)
+    return r.ok, r.text
 
 # ─── Decorator: Wajib Login ───────────────────────────────────────────────────
 def login_required(f):
@@ -48,14 +77,14 @@ def logout():
 @login_required
 def dashboard():
     try:
-        products = supabase.table('products').select('*').execute()
-        transactions = supabase.table('transactions').select('*').order('created_at', desc=True).execute()
+        products = sb_get('products', {'select': '*'})
+        transactions = sb_get('transactions', {'select': '*', 'order': 'created_at.desc'})
 
-        total_products = len(products.data)
-        total_orders = len(transactions.data)
-        total_revenue = sum(t.get('total_harga', 0) for t in transactions.data)
-        pending_orders = [t for t in transactions.data if t.get('status') == 'Pending']
-        recent_orders = transactions.data[:5]
+        total_products = len(products) if isinstance(products, list) else 0
+        total_orders = len(transactions) if isinstance(transactions, list) else 0
+        total_revenue = sum(t.get('total_harga', 0) for t in (transactions if isinstance(transactions, list) else []))
+        pending_orders = [t for t in (transactions if isinstance(transactions, list) else []) if t.get('status') == 'Pending']
+        recent_orders = (transactions if isinstance(transactions, list) else [])[:5]
     except Exception as e:
         flash(f'Error mengambil data: {e}', 'danger')
         total_products = total_orders = total_revenue = 0
@@ -73,11 +102,9 @@ def dashboard():
 @app.route('/products')
 @login_required
 def products():
-    try:
-        res = supabase.table('products').select('*').order('name').execute()
-        product_list = res.data
-    except Exception as e:
-        flash(f'Error: {e}', 'danger')
+    product_list = sb_get('products', {'select': '*', 'order': 'name.asc'})
+    if not isinstance(product_list, list):
+        flash('Error mengambil data produk.', 'danger')
         product_list = []
     return render_template('products.html', products=product_list)
 
@@ -92,24 +119,23 @@ def add_product():
             'image_url': request.form.get('image_url'),
             'category': request.form.get('category'),
         }
-        try:
-            supabase.table('products').insert(data).execute()
+        ok, msg = sb_insert('products', data)
+        if ok:
             flash(f'Produk "{data["name"]}" berhasil ditambahkan!', 'success')
             return redirect(url_for('products'))
-        except Exception as e:
-            flash(f'Gagal menambahkan produk: {e}', 'danger')
+        else:
+            flash(f'Gagal menambahkan produk: {msg}', 'danger')
 
     return render_template('product_form.html', product=None, action='Tambah')
 
 @app.route('/products/edit/<product_id>', methods=['GET', 'POST'])
 @login_required
 def edit_product(product_id):
-    try:
-        res = supabase.table('products').select('*').eq('id', product_id).single().execute()
-        product = res.data
-    except Exception as e:
-        flash(f'Produk tidak ditemukan: {e}', 'danger')
+    result = sb_get('products', {'select': '*', 'id': f'eq.{product_id}'})
+    if not result or not isinstance(result, list):
+        flash('Produk tidak ditemukan.', 'danger')
         return redirect(url_for('products'))
+    product = result[0]
 
     if request.method == 'POST':
         data = {
@@ -119,34 +145,32 @@ def edit_product(product_id):
             'image_url': request.form.get('image_url'),
             'category': request.form.get('category'),
         }
-        try:
-            supabase.table('products').update(data).eq('id', product_id).execute()
+        ok, msg = sb_update('products', 'id', product_id, data)
+        if ok:
             flash(f'Produk "{data["name"]}" berhasil diupdate!', 'success')
             return redirect(url_for('products'))
-        except Exception as e:
-            flash(f'Gagal mengupdate produk: {e}', 'danger')
+        else:
+            flash(f'Gagal mengupdate produk: {msg}', 'danger')
 
     return render_template('product_form.html', product=product, action='Edit')
 
 @app.route('/products/delete/<product_id>', methods=['POST'])
 @login_required
 def delete_product(product_id):
-    try:
-        supabase.table('products').delete().eq('id', product_id).execute()
+    ok, msg = sb_delete('products', 'id', product_id)
+    if ok:
         flash('Produk berhasil dihapus.', 'success')
-    except Exception as e:
-        flash(f'Gagal menghapus produk: {e}', 'danger')
+    else:
+        flash(f'Gagal menghapus produk: {msg}', 'danger')
     return redirect(url_for('products'))
 
 # ─── PESANAN ──────────────────────────────────────────────────────────────────
 @app.route('/orders')
 @login_required
 def orders():
-    try:
-        res = supabase.table('transactions').select('*').order('created_at', desc=True).execute()
-        order_list = res.data
-    except Exception as e:
-        flash(f'Error: {e}', 'danger')
+    order_list = sb_get('transactions', {'select': '*', 'order': 'created_at.desc'})
+    if not isinstance(order_list, list):
+        flash('Error mengambil data pesanan.', 'danger')
         order_list = []
     return render_template('orders.html', orders=order_list)
 
@@ -154,15 +178,14 @@ def orders():
 @login_required
 def update_order_status(order_id):
     new_status = request.form.get('status')
-    try:
-        supabase.table('transactions').update({'status': new_status}).eq('id', order_id).execute()
+    ok, msg = sb_update('transactions', 'id', order_id, {'status': new_status})
+    if ok:
         flash(f'Status pesanan berhasil diubah menjadi "{new_status}"!', 'success')
-    except Exception as e:
-        flash(f'Gagal update status: {e}', 'danger')
+    else:
+        flash(f'Gagal update status: {msg}', 'danger')
     return redirect(url_for('orders'))
 
 # ─── RUN ──────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    import os
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
