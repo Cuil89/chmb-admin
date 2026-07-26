@@ -1,8 +1,11 @@
 import os
+import re
+import json
 import requests as req
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from functools import wraps
 from dotenv import load_dotenv
+from bs4 import BeautifulSoup
 
 load_dotenv()
 
@@ -13,6 +16,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ubisgngdfdrhdnclfnln.supa
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_publishable_4Hz3bB3u3Kw1kkzboMDhmA_OKL6shMi")
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "chmb2026")
+GEMINI_KEY = os.environ.get("GEMINI_KEY", "")
 
 HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -184,6 +188,108 @@ def update_order_status(order_id):
     else:
         flash(f'Gagal update status: {msg}', 'danger')
     return redirect(url_for('orders'))
+
+# ─── AI AUTO-GENERATE (Gemini) ───────────────────────────────────────────────
+@app.route('/api/ai-generate', methods=['POST'])
+@login_required
+def ai_generate():
+    if not GEMINI_KEY:
+        return jsonify({'error': 'GEMINI_KEY belum diset di environment variables.'}), 500
+
+    keyword = request.json.get('keyword', '').strip()
+    if not keyword:
+        return jsonify({'error': 'Keyword tidak boleh kosong.'}), 400
+
+    prompt = f"""Kamu adalah copywriter untuk brand fashion streetwear Indonesia bernama CHMB.
+Buat data produk lengkap berdasarkan keyword berikut: "{keyword}".
+
+Balas HANYA dengan JSON valid (tidak ada teks lain), format:
+{{
+  "name": "nama produk CHMB yang catchy dan lengkap",
+  "description": "deskripsi produk 1-2 kalimat, bahasa Indonesia, sebutkan bahan/keunggulan",
+  "category": "pilih salah satu: T-Shirt, Hoodie, atau Pants",
+  "price": angka harga dalam rupiah (tanpa titik/koma, contoh: 189000)
+}}"""
+
+    try:
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        r = req.post(gemini_url, json=payload, timeout=15)
+        r.raise_for_status()
+
+        raw = r.json()['candidates'][0]['content']['parts'][0]['text']
+        # Bersihkan markdown code block kalau ada
+        clean = re.sub(r'```(?:json)?|```', '', raw).strip()
+        result = json.loads(clean)
+        return jsonify(result)
+    except json.JSONDecodeError:
+        return jsonify({'error': 'AI mengembalikan format tidak valid, coba lagi.'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Gagal generate: {str(e)}'}), 500
+
+
+# ─── SCRAPE TOKOPEDIA URL ─────────────────────────────────────────────────────
+@app.route('/api/scrape-url', methods=['POST'])
+@login_required
+def scrape_url():
+    url = request.json.get('url', '').strip()
+    if not url or 'tokopedia.com' not in url:
+        return jsonify({'error': 'Masukkan URL produk Tokopedia yang valid.'}), 400
+
+    headers_scrape = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+        'Accept-Language': 'id-ID,id;q=0.9,en;q=0.8',
+    }
+
+    try:
+        r = req.get(url, headers=headers_scrape, timeout=10)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, 'html.parser')
+
+        result = {}
+
+        # Nama produk
+        name_tag = (soup.find('h1') or
+                    soup.find('meta', {'property': 'og:title'}) or
+                    soup.find('title'))
+        if name_tag:
+            result['name'] = (name_tag.get('content') or name_tag.get_text()).strip()[:120]
+
+        # Gambar produk
+        img_tag = soup.find('meta', {'property': 'og:image'})
+        if img_tag:
+            result['image_url'] = img_tag.get('content', '')
+
+        # Deskripsi
+        desc_tag = soup.find('meta', {'property': 'og:description'}) or \
+                   soup.find('meta', {'name': 'description'})
+        if desc_tag:
+            result['description'] = (desc_tag.get('content') or '').strip()[:300]
+
+        # Harga — cari pattern angka setelah "Rp"
+        price_match = re.search(r'Rp[\s.]*(\d[\d.]+)', r.text)
+        if price_match:
+            raw_price = price_match.group(1).replace('.', '')
+            result['price'] = int(raw_price)
+
+        # Tebak kategori dari nama
+        name_lower = result.get('name', '').lower()
+        if any(k in name_lower for k in ['hoodie', 'zipper', 'sweater', 'crewneck']):
+            result['category'] = 'Hoodie'
+        elif any(k in name_lower for k in ['pants', 'celana', 'cargo', 'sweatpants', 'jogger']):
+            result['category'] = 'Pants'
+        else:
+            result['category'] = 'T-Shirt'
+
+        if not result.get('name'):
+            return jsonify({'error': 'Tidak bisa membaca data dari halaman ini. Coba URL lain.'}), 422
+
+        return jsonify(result)
+    except req.exceptions.Timeout:
+        return jsonify({'error': 'Timeout. Halaman terlalu lama merespons.'}), 504
+    except Exception as e:
+        return jsonify({'error': f'Gagal scrape: {str(e)}'}), 500
+
 
 # ─── RUN ──────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
