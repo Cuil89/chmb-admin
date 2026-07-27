@@ -9,127 +9,223 @@
   <h4 class="text-white fw-bold mt-2 mb-0">{{ action }} Produk</h4>
 </div>
 
-<!-- ✨ AUTO-FILL TOOLS PANEL -->
-<div class="content-card p-4 mb-4" style="max-width:640px; border-color:#333;">
-  <div class="d-flex align-items-center gap-2 mb-3">
-    <div style="width:32px;height:32px;background:linear-gradient(135deg,#8b5cf6,#3b82f6);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:0.95rem;">✨</div>
-    <div>
-      <div class="text-white fw-bold" style="font-size:0.9rem;">Auto-Fill Tools</div>
-      <div class="text-secondary" style="font-size:0.75rem;">Isi form otomatis pakai AI atau import dari Tokopedia</div>
+<div class="row g-4">
+  <!-- FORM COL (Left) -->
+  <div class="col-lg-7">
+    <!-- ✨ AUTO-FILL TOOLS PANEL -->
+    <div class="content-card p-4 mb-4" style="border-color:#333;">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <div style="width:34px;height:34px;background:linear-gradient(135deg,#8b5cf6,#3b82f6);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem;color:#fff;">✨</div>
+        <div>
+          <div class="text-white fw-bold" style="font-size:0.95rem;">Smart Auto-Fill & AI Engine</div>
+          <div class="text-secondary" style="font-size:0.75rem;">Isi nama, harga, deskripsi & gambar otomatis dengan AI atau URL</div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <ul class="nav nav-pills gap-2 mb-3" id="autofillTab" role="tablist" style="border:none;">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active px-3 py-2" id="ai-tab" data-bs-toggle="pill" data-bs-target="#ai-pane" type="button"
+            style="font-size:0.8rem;font-weight:700;background:#252525;color:#aaa;border-radius:10px;">
+            🤖 AI Generate
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link px-3 py-2" id="url-tab" data-bs-toggle="pill" data-bs-target="#url-pane" type="button"
+            style="font-size:0.8rem;font-weight:700;background:#252525;color:#aaa;border-radius:10px;">
+            🔗 Import URL / Tokopedia
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+        <!-- AI Generate Tab -->
+        <div class="tab-pane fade show active" id="ai-pane">
+          <div class="d-flex gap-2">
+            <input type="text" id="ai-keyword" class="form-control" placeholder="Ketik kata kunci (misal: boxy fit hoodie, cargo pants...)" style="font-size:0.875rem;">
+            <button type="button" onclick="generateWithAI()" class="btn fw-bold px-4" id="ai-btn"
+              style="background:linear-gradient(135deg,#8b5cf6,#3b82f6);color:#fff;white-space:nowrap;border-radius:10px;font-size:0.85rem;">
+              <span id="ai-btn-text">✨ Generate</span>
+            </button>
+          </div>
+          <div id="ai-error" class="mt-2 text-danger" style="font-size:0.8rem;display:none;"></div>
+        </div>
+
+        <!-- Tokopedia URL Tab -->
+        <div class="tab-pane fade" id="url-pane">
+          <div class="d-flex gap-2">
+            <input type="url" id="scrape-url" class="form-control" placeholder="Tempel URL Tokopedia / E-Commerce di sini..." style="font-size:0.875rem;">
+            <button type="button" onclick="importFromURL()" class="btn fw-bold px-4" id="scrape-btn"
+              style="background:linear-gradient(135deg,#059669,#0891b2);color:#fff;white-space:nowrap;border-radius:10px;font-size:0.85rem;">
+              <span id="scrape-btn-text">🔗 Import Data</span>
+            </button>
+          </div>
+          <div id="scrape-error" class="mt-2 text-danger" style="font-size:0.8rem;display:none;"></div>
+        </div>
+      </div>
+
+      <!-- Success Banner -->
+      <div id="autofill-success" class="mt-3 p-2 rounded-3 d-none"
+        style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.4);font-size:0.8rem;color:#10b981;">
+        <i class="bi bi-check-circle-fill me-1"></i>
+        <span id="autofill-success-msg">Data produk berhasil terisi dan diperbarui secara otomatis!</span>
+      </div>
+    </div>
+
+    <!-- FORM DETAIL PRODUK -->
+    <div class="content-card p-4">
+      <div class="d-flex align-items-center gap-2 mb-4">
+        <div style="font-size:0.75rem;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Detail Input Produk</div>
+        <div style="flex:1;height:1px;background:#2a2a2a;"></div>
+      </div>
+
+      <form method="POST">
+        <div class="row g-4">
+          <div class="col-12">
+            <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">NAMA PRODUK *</label>
+            <input type="text" name="name" id="f-name" class="form-control" required
+              value="{{ product.name if product else '' }}"
+              placeholder="Contoh: CHMB Heavyweight Oversized Tee" oninput="updatePreview()">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">HARGA (Rp) *</label>
+            <input type="number" name="price" id="f-price" class="form-control" required min="0" step="1000"
+              value="{{ product.price if product else '' }}"
+              placeholder="150000" oninput="updatePreview()">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">KATEGORI *</label>
+            <select name="category" id="f-category" class="form-control" required onchange="updatePreview()">
+              {% for cat in ['T-Shirt', 'Hoodie', 'Pants'] %}
+                <option value="{{ cat }}"
+                  {{ 'selected' if product and product.category == cat else '' }}>{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- FOTO & GAMBAR PRODUK -->
+          <div class="col-12">
+            <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">FOTO PRODUK</label>
+            
+            <!-- Upload File / Drag & Drop -->
+            <div class="p-3 mb-2 rounded-3 text-center" style="background:#141414; border:2px dashed #333; cursor:pointer;" onclick="document.getElementById('file-input').click()">
+              <i class="bi bi-cloud-arrow-up fs-3 text-secondary"></i>
+              <div class="text-white fw-bold mt-1" style="font-size:0.85rem;">Upload Foto dari Laptop/HP</div>
+              <div class="text-secondary" style="font-size:0.75rem;">Klik di sini untuk pilih file (PNG, JPG, WEBP)</div>
+              <input type="file" id="file-input" accept="image/*" class="d-none" onchange="handleFileUpload(event)">
+            </div>
+
+            <!-- Alternative URL -->
+            <div class="input-group mb-2">
+              <span class="input-group-text bg-dark border-secondary text-secondary" style="font-size:0.8rem;">Link URL</span>
+              <input type="url" name="image_url" id="f-image" class="form-control"
+                value="{{ product.image_url if product else '' }}"
+                placeholder="https://images.unsplash.com/..." oninput="updatePreview()">
+            </div>
+
+            <!-- Preset Images Quick Selection -->
+            <div class="d-flex align-items-center gap-2 mt-2">
+              <span class="text-secondary" style="font-size:0.75rem;">Pilih Preset Foto:</span>
+              <button type="button" class="btn btn-sm btn-outline-dark text-secondary px-2 py-0" style="font-size:0.7rem;" onclick="setPresetImg('tshirt')">👕 T-Shirt</button>
+              <button type="button" class="btn btn-sm btn-outline-dark text-secondary px-2 py-0" style="font-size:0.7rem;" onclick="setPresetImg('hoodie')">🧥 Hoodie</button>
+              <button type="button" class="btn btn-sm btn-outline-dark text-secondary px-2 py-0" style="font-size:0.7rem;" onclick="setPresetImg('pants')">👖 Pants</button>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">DESKRIPSI PRODUK</label>
+            <textarea name="description" id="f-desc" class="form-control" rows="4"
+              placeholder="Deskripsi detail produk baju CHMB..." oninput="updatePreview()">{{ product.description if product else '' }}</textarea>
+          </div>
+          <div class="col-12 d-flex gap-3 pt-2">
+            <button type="submit" class="btn btn-light fw-bold px-4 rounded-3" style="font-size:0.9rem;">
+              <i class="bi bi-check-lg me-1"></i>{{ action }} Produk
+            </button>
+            <a href="{{ url_for('products') }}" class="btn btn-outline-secondary rounded-3" style="font-size:0.9rem;">Batal</a>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
 
-  <!-- Tabs -->
-  <ul class="nav nav-pills gap-2 mb-3" id="autofillTab" role="tablist" style="border:none;">
-    <li class="nav-item" role="presentation">
-      <button class="nav-link active px-3 py-2" id="ai-tab" data-bs-toggle="pill" data-bs-target="#ai-pane" type="button"
-        style="font-size:0.8rem;font-weight:700;background:#252525;color:#aaa;border-radius:10px;">
-        🤖 AI Generate
-      </button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link px-3 py-2" id="url-tab" data-bs-toggle="pill" data-bs-target="#url-pane" type="button"
-        style="font-size:0.8rem;font-weight:700;background:#252525;color:#aaa;border-radius:10px;">
-        🔗 Import Tokopedia
-      </button>
-    </li>
-  </ul>
+  <!-- LIVE PREVIEW CARD COL (Right) -->
+  <div class="col-lg-5">
+    <div class="sticky-top" style="top:90px;">
+      <div class="content-card p-4">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div class="text-white fw-bold" style="font-size:0.85rem;letter-spacing:1px;text-transform:uppercase;">
+            <i class="bi bi-eye me-1 text-primary"></i>Live Card Preview
+          </div>
+          <span class="badge bg-success bg-opacity-20 text-success rounded-pill" style="font-size:0.7rem;">Realtime</span>
+        </div>
 
-  <div class="tab-content">
-    <!-- AI Generate Tab -->
-    <div class="tab-pane fade show active" id="ai-pane">
-      <div class="d-flex gap-2">
-        <input type="text" id="ai-keyword" class="form-control" placeholder="Contoh: slim fit cargo hitam, oversized tee putih..." style="font-size:0.875rem;">
-        <button type="button" onclick="generateWithAI()" class="btn fw-bold px-4" id="ai-btn"
-          style="background:linear-gradient(135deg,#8b5cf6,#3b82f6);color:#fff;white-space:nowrap;border-radius:10px;font-size:0.85rem;">
-          <span id="ai-btn-text">✨ Generate</span>
-        </button>
+        <!-- Preview Card -->
+        <div class="rounded-4 overflow-hidden" style="background:#121212; border:1px solid #282828;">
+          <div style="position:relative; width:100%; height:260px; background:#1e1e1e; overflow:hidden;">
+            <img id="prev-img" src="https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+              style="width:100%; height:100%; object-fit:cover;"
+              onerror="this.src='https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80'">
+            <span id="prev-badge" class="badge bg-white text-dark fw-bold position-absolute top-0 end-0 m-3 px-3 py-2 rounded-pill shadow-sm" style="font-size:0.75rem;">T-Shirt</span>
+          </div>
+          <div class="p-3">
+            <h5 id="prev-name" class="text-white fw-bold mb-1" style="font-size:1.05rem;">Nama Produk CHMB</h5>
+            <div id="prev-price" class="fw-bold mb-2" style="font-size:1.15rem; color:#10b981;">Rp 150.000</div>
+            <p id="prev-desc" class="text-secondary mb-0" style="font-size:0.8rem; line-height:1.4; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">
+              Deskripsi detail produk akan muncul secara otomatis di sini...
+            </p>
+          </div>
+        </div>
+        <div class="text-center mt-3 text-secondary" style="font-size:0.75rem;">
+          Tampilan kartu di atas adalah simulasi persis tampilan produk di mobile app CHMB.
+        </div>
       </div>
-      <div id="ai-error" class="mt-2 text-danger" style="font-size:0.8rem;display:none;"></div>
     </div>
-
-    <!-- Tokopedia URL Tab -->
-    <div class="tab-pane fade" id="url-pane">
-      <div class="d-flex gap-2">
-        <input type="url" id="scrape-url" class="form-control" placeholder="https://www.tokopedia.com/namatoko/nama-produk..." style="font-size:0.875rem;">
-        <button type="button" onclick="importFromURL()" class="btn fw-bold px-4" id="scrape-btn"
-          style="background:linear-gradient(135deg,#059669,#0891b2);color:#fff;white-space:nowrap;border-radius:10px;font-size:0.85rem;">
-          <span id="scrape-btn-text">🔗 Import</span>
-        </button>
-      </div>
-      <div id="scrape-error" class="mt-2 text-danger" style="font-size:0.8rem;display:none;"></div>
-    </div>
-  </div>
-
-  <!-- Success Banner -->
-  <div id="autofill-success" class="mt-3 p-2 rounded-3 d-none"
-    style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);font-size:0.8rem;color:#10b981;">
-    <i class="bi bi-check-circle me-1"></i>
-    <span id="autofill-success-msg">Form berhasil diisi otomatis! Silakan cek dan edit jika perlu.</span>
   </div>
 </div>
 
-<!-- FORM PRODUK (Manual - tetap ada) -->
-<div class="content-card p-4" style="max-width:640px;">
-  <div class="d-flex align-items-center gap-2 mb-4">
-    <div style="font-size:0.75rem;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Detail Produk</div>
-    <div style="flex:1;height:1px;background:#2a2a2a;"></div>
-  </div>
-
-  <form method="POST">
-    <div class="row g-4">
-      <div class="col-12">
-        <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">NAMA PRODUK *</label>
-        <input type="text" name="name" id="f-name" class="form-control" required
-          value="{{ product.name if product else '' }}"
-          placeholder="Contoh: CHMB Heavyweight Oversized Tee">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">HARGA (Rp) *</label>
-        <input type="number" name="price" id="f-price" class="form-control" required min="0" step="1000"
-          value="{{ product.price if product else '' }}"
-          placeholder="150000">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">KATEGORI *</label>
-        <select name="category" id="f-category" class="form-control" required>
-          {% for cat in ['T-Shirt', 'Hoodie', 'Pants'] %}
-            <option value="{{ cat }}"
-              {{ 'selected' if product and product.category == cat else '' }}>{{ cat }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-12">
-        <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">URL GAMBAR PRODUK</label>
-        <input type="url" name="image_url" id="f-image" class="form-control"
-          value="{{ product.image_url if product else '' }}"
-          placeholder="https://images.unsplash.com/photo-...">
-        <div class="form-text" style="color:#555;">Tempelkan link URL gambar produk (bisa dari Unsplash, Google Photos, dll)</div>
-      </div>
-      <div class="col-12">
-        <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">DESKRIPSI PRODUK</label>
-        <textarea name="description" id="f-desc" class="form-control" rows="4"
-          placeholder="Deskripsi detail produk baju CHMB...">{{ product.description if product else '' }}</textarea>
-      </div>
-      <div class="col-12 d-flex gap-3">
-        <button type="submit" class="btn btn-light fw-bold px-4 rounded-3">
-          <i class="bi bi-check-lg me-1"></i>{{ action }} Produk
-        </button>
-        <a href="{{ url_for('products') }}" class="btn btn-outline-secondary rounded-3">Batal</a>
-      </div>
-    </div>
-  </form>
-</div>
-
-<!-- JavaScript Auto-Fill -->
+<!-- JavaScript Engine -->
 <script>
-function setLoading(btnId, textId, loading, defaultText) {
-  const btn = document.getElementById(btnId);
-  const txt = document.getElementById(textId);
-  btn.disabled = loading;
-  txt.innerHTML = loading
-    ? '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Loading...'
-    : defaultText;
+const PRESET_IMAGES = {
+  tshirt: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80',
+  hoodie: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80',
+  pants: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=800&q=80'
+};
+
+function formatRupiah(number) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number || 0);
+}
+
+function updatePreview() {
+  const name = document.getElementById('f-name').value.trim() || 'Nama Produk CHMB';
+  const price = document.getElementById('f-price').value || 0;
+  const category = document.getElementById('f-category').value || 'T-Shirt';
+  const desc = document.getElementById('f-desc').value.trim() || 'Deskripsi detail produk akan muncul di sini...';
+  const imgUrl = document.getElementById('f-image').value.trim() || PRESET_IMAGES[category.toLowerCase().replace('-', '')] || PRESET_IMAGES.tshirt;
+
+  document.getElementById('prev-name').textContent = name;
+  document.getElementById('prev-price').textContent = formatRupiah(price);
+  document.getElementById('prev-badge').textContent = category;
+  document.getElementById('prev-desc').textContent = desc;
+  document.getElementById('prev-img').src = imgUrl;
+}
+
+function setPresetImg(type) {
+  if (PRESET_IMAGES[type]) {
+    document.getElementById('f-image').value = PRESET_IMAGES[type];
+    updatePreview();
+  }
+}
+
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('f-image').value = e.target.result;
+      updatePreview();
+    };
+    reader.readAsDataURL(file);
+  }
 }
 
 function fillForm(data) {
@@ -140,12 +236,21 @@ function fillForm(data) {
   if (data.category) {
     const sel = document.getElementById('f-category');
     for (let opt of sel.options) {
-      if (opt.value === data.category) { opt.selected = true; break; }
+      if (opt.value.toLowerCase() === data.category.toLowerCase()) { opt.selected = true; break; }
     }
   }
+  updatePreview();
   const successEl = document.getElementById('autofill-success');
   successEl.classList.remove('d-none');
-  successEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function setLoading(btnId, textId, loading, defaultText) {
+  const btn = document.getElementById(btnId);
+  const txt = document.getElementById(textId);
+  btn.disabled = loading;
+  txt.innerHTML = loading
+    ? '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Memproses...'
+    : defaultText;
 }
 
 async function generateWithAI() {
@@ -153,7 +258,7 @@ async function generateWithAI() {
   const errEl = document.getElementById('ai-error');
   errEl.style.display = 'none';
 
-  if (!keyword) { errEl.textContent = 'Tulis keyword produk dulu.'; errEl.style.display = ''; return; }
+  if (!keyword) { errEl.textContent = 'Tulis kata kunci produk dulu.'; errEl.style.display = ''; return; }
 
   setLoading('ai-btn', 'ai-btn-text', true);
   try {
@@ -177,7 +282,7 @@ async function importFromURL() {
   const errEl = document.getElementById('scrape-error');
   errEl.style.display = 'none';
 
-  if (!url) { errEl.textContent = 'Masukkan URL Tokopedia.'; errEl.style.display = ''; return; }
+  if (!url) { errEl.textContent = 'Masukkan URL Tokopedia / E-Commerce.'; errEl.style.display = ''; return; }
 
   setLoading('scrape-btn', 'scrape-btn-text', true);
   try {
@@ -192,12 +297,13 @@ async function importFromURL() {
   } catch (e) {
     errEl.textContent = 'Gagal terhubung ke server.'; errEl.style.display = '';
   } finally {
-    setLoading('scrape-btn', 'scrape-btn-text', false, '🔗 Import');
+    setLoading('scrape-btn', 'scrape-btn-text', false, '🔗 Import Data');
   }
 }
 
-// Enter key shortcut
+// Shortcuts & Init
 document.getElementById('ai-keyword').addEventListener('keydown', e => { if (e.key === 'Enter') generateWithAI(); });
 document.getElementById('scrape-url').addEventListener('keydown', e => { if (e.key === 'Enter') importFromURL(); });
+window.onload = updatePreview;
 </script>
 {% endblock %}

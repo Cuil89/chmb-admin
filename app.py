@@ -200,15 +200,21 @@ def ai_generate():
     if not keyword:
         return jsonify({'error': 'Keyword tidak boleh kosong.'}), 400
 
-    prompt = f"""Kamu adalah copywriter untuk brand fashion streetwear Indonesia bernama CHMB.
-Buat data produk lengkap berdasarkan keyword berikut: "{keyword}".
+    prompt = f"""Kamu adalah copywriter dan E-commerce Specialist untuk brand fashion streetwear Indonesia bernama CHMB.
+Buat data produk lengkap dan akurat berdasarkan keyword/nama berikut: "{keyword}".
 
-Balas HANYA dengan JSON valid (tidak ada teks lain), format:
+Sediakan juga salah satu URL gambar streetwear berkualitas tinggi dari Unsplash yang paling cocok:
+- T-Shirt: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+- Hoodie: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80"
+- Pants: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=800&q=80"
+
+Balas HANYA dengan JSON valid (tanpa markdown), format:
 {{
-  "name": "nama produk CHMB yang catchy dan lengkap",
-  "description": "deskripsi produk 1-2 kalimat, bahasa Indonesia, sebutkan bahan/keunggulan",
-  "category": "pilih salah satu: T-Shirt, Hoodie, atau Pants",
-  "price": angka harga dalam rupiah (tanpa titik/koma, contoh: 189000)
+  "name": "Nama produk CHMB yang catchy, keren, dan rapi",
+  "description": "Deskripsi produk 2-3 kalimat menarik dalam Bahasa Indonesia, sebutkan bahan (seperti Cotton Combed 24s / Heavyweight Fleece), keunggulan, dan gaya fitting",
+  "category": "T-Shirt" atau "Hoodie" atau "Pants",
+  "price": estimasi harga realistis (angka saja, contoh: 179000 untuk T-Shirt, 329000 untuk Hoodie, 289000 untuk Pants),
+  "image_url": "pilih salah satu URL gambar di atas yang paling sesuai dengan kategori"
 }}"""
 
     try:
@@ -305,14 +311,20 @@ def scrape_url():
     # ─── FALLBACK: Parse URL via Gemini AI jika Tokopedia blokir ───
     if GEMINI_KEY:
         slug = url.split('/')[-1].replace('-', ' ').replace('_', ' ')
-        prompt = f"""Kamu adalah asisten e-commerce. Ekstrak data produk berdasarkan URL/slug e-commerce berikut: "{slug}".
+        prompt = f"""Kamu adalah asisten e-commerce fashion streetwear. Ekstrak data produk berdasarkan URL/slug e-commerce berikut: "{slug}".
+
+Sediakan salah satu URL gambar streetwear berkualitas tinggi dari Unsplash yang paling cocok:
+- T-Shirt: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+- Hoodie: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80"
+- Pants: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=800&q=80"
 
 Balas HANYA dengan JSON valid (tanpa markdown), format:
 {{
-  "name": "nama produk lengkap yang rapi dan profesional",
-  "description": "deskripsi produk streetwear CHMB yang bagus 1-2 kalimat",
-  "category": "pilih salah satu: T-Shirt, Hoodie, atau Pants",
-  "price": estimasi harga rupiah (angka saja, contoh: 199000)
+  "name": "Nama produk lengkap yang rapi dan profesional",
+  "description": "Deskripsi produk streetwear CHMB yang bagus dan detail 2 kalimat",
+  "category": "T-Shirt" atau "Hoodie" atau "Pants",
+  "price": estimasi harga rupiah realistis (angka saja, contoh: 179000 untuk T-Shirt, 329000 untuk Hoodie),
+  "image_url": "pilih salah satu URL gambar di atas yang paling sesuai dengan kategori"
 }}"""
         try:
             gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}"
