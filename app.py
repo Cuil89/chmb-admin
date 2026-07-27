@@ -237,67 +237,89 @@ Balas HANYA dengan JSON valid (tidak ada teks lain), format:
         return jsonify({'error': f'Gagal generate: {str(e)}'}), 500
 
 
-# ─── SCRAPE TOKOPEDIA URL ─────────────────────────────────────────────────────
+# ─── SCRAPE TOKOPEDIA / URL IMPORT ────────────────────────────────────────────
 @app.route('/api/scrape-url', methods=['POST'])
 @login_required
 def scrape_url():
     url = request.json.get('url', '').strip()
-    if not url or 'tokopedia.com' not in url:
-        return jsonify({'error': 'Masukkan URL produk Tokopedia yang valid.'}), 400
+    if not url:
+        return jsonify({'error': 'Masukkan URL produk yang valid.'}), 400
 
     headers_scrape = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept-Language': 'id-ID,id;q=0.9,en;q=0.8',
     }
 
     try:
-        r = req.get(url, headers=headers_scrape, timeout=10)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, 'html.parser')
+        r = req.get(url, headers=headers_scrape, timeout=5)
+        if r.ok:
+            soup = BeautifulSoup(r.text, 'html.parser')
+            result = {}
 
-        result = {}
+            # Nama produk
+            name_tag = (soup.find('h1') or
+                        soup.find('meta', {'property': 'og:title'}) or
+                        soup.find('title'))
+            if name_tag:
+                result['name'] = (name_tag.get('content') or name_tag.get_text()).strip()[:120]
 
-        # Nama produk
-        name_tag = (soup.find('h1') or
-                    soup.find('meta', {'property': 'og:title'}) or
-                    soup.find('title'))
-        if name_tag:
-            result['name'] = (name_tag.get('content') or name_tag.get_text()).strip()[:120]
+            # Gambar produk
+            img_tag = soup.find('meta', {'property': 'og:image'})
+            if img_tag:
+                result['image_url'] = img_tag.get('content', '')
 
-        # Gambar produk
-        img_tag = soup.find('meta', {'property': 'og:image'})
-        if img_tag:
-            result['image_url'] = img_tag.get('content', '')
+            # Deskripsi
+            desc_tag = soup.find('meta', {'property': 'og:description'}) or \
+                       soup.find('meta', {'name': 'description'})
+            if desc_tag:
+                result['description'] = (desc_tag.get('content') or '').strip()[:300]
 
-        # Deskripsi
-        desc_tag = soup.find('meta', {'property': 'og:description'}) or \
-                   soup.find('meta', {'name': 'description'})
-        if desc_tag:
-            result['description'] = (desc_tag.get('content') or '').strip()[:300]
+            # Harga — cari pattern angka setelah "Rp"
+            price_match = re.search(r'Rp[\s.]*(\d[\d.]+)', r.text)
+            if price_match:
+                raw_price = price_match.group(1).replace('.', '')
+                result['price'] = int(raw_price)
 
-        # Harga — cari pattern angka setelah "Rp"
-        price_match = re.search(r'Rp[\s.]*(\d[\d.]+)', r.text)
-        if price_match:
-            raw_price = price_match.group(1).replace('.', '')
-            result['price'] = int(raw_price)
+            # Tebak kategori dari nama
+            name_lower = result.get('name', '').lower()
+            if any(k in name_lower for k in ['hoodie', 'zipper', 'sweater', 'crewneck']):
+                result['category'] = 'Hoodie'
+            elif any(k in name_lower for k in ['pants', 'celana', 'cargo', 'sweatpants', 'jogger']):
+                result['category'] = 'Pants'
+            else:
+                result['category'] = 'T-Shirt'
 
-        # Tebak kategori dari nama
-        name_lower = result.get('name', '').lower()
-        if any(k in name_lower for k in ['hoodie', 'zipper', 'sweater', 'crewneck']):
-            result['category'] = 'Hoodie'
-        elif any(k in name_lower for k in ['pants', 'celana', 'cargo', 'sweatpants', 'jogger']):
-            result['category'] = 'Pants'
-        else:
-            result['category'] = 'T-Shirt'
+            if result.get('name'):
+                return jsonify(result)
+    except Exception:
+        pass  # Fallback ke Gemini AI jika scraping diblokir / timeout
 
-        if not result.get('name'):
-            return jsonify({'error': 'Tidak bisa membaca data dari halaman ini. Coba URL lain.'}), 422
+    # ─── FALLBACK: Parse URL via Gemini AI jika Tokopedia blokir ───
+    if GEMINI_KEY:
+        slug = url.split('/')[-1].replace('-', ' ').replace('_', ' ')
+        prompt = f"""Kamu adalah asisten e-commerce. Ekstrak data produk berdasarkan URL/slug e-commerce berikut: "{slug}".
 
-        return jsonify(result)
-    except req.exceptions.Timeout:
-        return jsonify({'error': 'Timeout. Halaman terlalu lama merespons.'}), 504
-    except Exception as e:
-        return jsonify({'error': f'Gagal scrape: {str(e)}'}), 500
+Balas HANYA dengan JSON valid (tanpa markdown), format:
+{{
+  "name": "nama produk lengkap yang rapi dan profesional",
+  "description": "deskripsi produk streetwear CHMB yang bagus 1-2 kalimat",
+  "category": "pilih salah satu: T-Shirt, Hoodie, atau Pants",
+  "price": estimasi harga rupiah (angka saja, contoh: 199000)
+}}"""
+        try:
+            gemini_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+            gemini_headers = {"Content-Type": "application/json", "X-goog-api-key": GEMINI_KEY}
+            payload = {"contents": [{"parts": [{"text": prompt}]}]}
+            g_res = req.post(gemini_url, headers=gemini_headers, json=payload, timeout=10)
+            if g_res.ok:
+                raw = g_res.json()['candidates'][0]['content']['parts'][0]['text']
+                clean = re.sub(r'```(?:json)?|```', '', raw).strip()
+                ai_data = json.loads(clean)
+                return jsonify(ai_data)
+        except Exception as e:
+            return jsonify({'error': f'Gagal memproses URL: {str(e)}'}), 500
+
+    return jsonify({'error': 'Tidak bisa mengambil data dari URL ini. Silakan gunakan tab AI Generate atau isi manual.'}), 422
 
 
 # ─── RUN ──────────────────────────────────────────────────────────────────────
