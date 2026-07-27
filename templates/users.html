@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+
+{% block title %}Kelola User & Role - CHMB Admin{% endblock %}
+{% block page_title %}Kelola User & Role Pengguna{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <p class="text-secondary mb-0">Atur hak akses dan role pengguna (Admin, Pembeli, Tamu) aplikasi CHMB Store.</p>
+    <button class="btn btn-primary rounded-3 text-white fw-bold px-3" data-bs-toggle="modal" data-bs-target="#addUserModal">
+        <i class="bi bi-person-plus-fill me-2"></i> Tambah Pengguna Baru
+    </button>
+</div>
+
+<div class="card bg-surface border-theme rounded-4 shadow-sm overflow-hidden">
+    <div class="table-responsive">
+        <table class="table align-middle mb-0 text-white">
+            <thead class="bg-card text-secondary small text-uppercase">
+                <tr>
+                    <th class="ps-4">Pengguna</th>
+                    <th>Email</th>
+                    <th>Role Saat Ini</th>
+                    <th>Status ID</th>
+                    <th class="text-end pe-4">Aksi Role</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr class="border-bottom border-theme">
+                    <td class="ps-4 py-3">
+                        <div class="d-flex align-items-center">
+                            <div class="avatar-circle me-3 {% if u.role == 'admin' %}bg-primary{% else %}bg-secondary{% endif %} text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 40px; height: 40px;">
+                                {{ u.name[:1] | upper }}
+                            </div>
+                            <div>
+                                <h6 class="mb-0 fw-bold">{{ u.name }}</h6>
+                                <small class="text-secondary">ID: {{ u.id[:8] }}...</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-secondary">{{ u.email }}</span>
+                    </td>
+                    <td>
+                        {% if u.role == 'admin' %}
+                            <span class="badge bg-danger text-white px-3 py-2 rounded-pill fw-bold">
+                                <i class="bi bi-shield-lock-fill me-1"></i> ADMIN
+                            </span>
+                        {% elif u.role == 'user' or u.role == 'pembeli' %}
+                            <span class="badge bg-success text-white px-3 py-2 rounded-pill fw-bold">
+                                <i class="bi bi-bag-check-fill me-1"></i> PEMBELI / USER
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary text-white px-3 py-2 rounded-pill fw-bold">
+                                <i class="bi bi-eye-fill me-1"></i> TAMU
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-card border border-theme text-secondary px-2.5 py-1.5 rounded-3">
+                            <i class="bi bi-check-circle-fill text-success me-1"></i> Terverifikasi
+                        </span>
+                    </td>
+                    <td class="text-end pe-4">
+                        <form action="{{ url_for('update_user_role', user_id=u.id) }}" method="POST" class="d-inline-flex gap-2">
+                            <select name="role" class="form-select form-select-sm bg-card text-white border-theme rounded-3" style="width: 140px;">
+                                <option value="user" {% if u.role != 'admin' %}selected{% endif %}>Pembeli (User)</option>
+                                <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin Console</option>
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline-light rounded-3">
+                                <i class="bi bi-save me-1"></i> Ubah
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-secondary">
+                        <i class="bi bi-people display-4 d-block mb-3 opacity-50"></i>
+                        Belum ada data pengguna terdaftar.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Tambah User -->
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-surface text-white border-theme rounded-4">
+            <div class="modal-header border-bottom border-theme">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-person-plus-fill me-2 text-primary"></i> Tambah Pengguna / Role Baru
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('add_user') }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Nama Lengkap</label>
+                        <input type="text" name="name" class="form-control bg-card text-white border-theme rounded-3" placeholder="Contoh: Ahmad Subagyo" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Email</label>
+                        <input type="email" name="email" class="form-control bg-card text-white border-theme rounded-3" placeholder="email@domain.com" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Pilih Role Akses</label>
+                        <select name="role" class="form-select bg-card text-white border-theme rounded-3" required>
+                            <option value="user">Pembeli (User Biasa)</option>
+                            <option value="admin">Admin (Pengelola Toko)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-theme">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary rounded-3 text-white fw-bold">Simpan Pengguna</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

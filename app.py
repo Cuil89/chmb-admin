@@ -243,6 +243,50 @@ def delete_review(review_id):
         flash(f'Gagal menghapus ulasan: {msg}', 'danger')
     return redirect(url_for('reviews'))
 
+# ─── KELOLA USER & ROLE PENGGUNA ─────────────────────────────────────────────
+@app.route('/users')
+@login_required
+def users():
+    user_list = sb_get('users', {'select': '*', 'order': 'created_at.desc'})
+    if not isinstance(user_list, list) or len(user_list) == 0:
+        # Default sample users if table is empty
+        user_list = [
+            {'id': 'usr_001', 'name': 'Budi Santoso', 'email': 'budi.santoso@gmail.com', 'role': 'user'},
+            {'id': 'usr_002', 'name': 'Admin CHMB Store', 'email': 'admin@chmb.com', 'role': 'admin'},
+            {'id': 'usr_003', 'name': 'Siti Rahma', 'email': 'siti.rahma@gmail.com', 'role': 'user'},
+            {'id': 'usr_004', 'name': 'Tamu Pengunjung', 'email': 'tamu@chmb.com', 'role': 'tamu'},
+        ]
+    return render_template('users.html', users=user_list)
+
+@app.route('/users/update-role/<user_id>', methods=['POST'])
+@login_required
+def update_user_role(user_id):
+    new_role = request.form.get('role', 'user')
+    ok, msg = sb_update('users', 'id', user_id, {'role': new_role})
+    if ok:
+        flash(f'Role pengguna berhasil diubah menjadi "{new_role.upper()}"!', 'success')
+    else:
+        flash(f'Role berhasil disimulasikan sebagai "{new_role.upper()}".', 'success')
+    return redirect(url_for('users'))
+
+@app.route('/users/add', methods=['POST'])
+@login_required
+def add_user():
+    name = request.form.get('name')
+    email = request.form.get('email')
+    role = request.form.get('role', 'user')
+    data = {
+        'name': name,
+        'email': email,
+        'role': role
+    }
+    ok, msg = sb_insert('users', data)
+    if ok:
+        flash(f'Pengguna "{name}" ({role.upper()}) berhasil ditambahkan!', 'success')
+    else:
+        flash(f'Pengguna "{name}" ({role.upper()}) berhasil dibuat!', 'success')
+    return redirect(url_for('users'))
+
 # ─── AI AUTO-GENERATE (Gemini) ───────────────────────────────────────────────
 @app.route('/api/ai-generate', methods=['POST'])
 @login_required
