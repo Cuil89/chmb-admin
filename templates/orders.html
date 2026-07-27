@@ -31,13 +31,14 @@
         <td class="fw-bold text-white">Rp {{ "{:,.0f}".format(order.total_harga or 0) }}</td>
         <td style="max-width:200px; color:#888; font-size:0.82rem;">{{ order.alamat }}</td>
         <td>
-          {% if order.proof_image_url %}
-            <a href="{{ order.proof_image_url }}" target="_blank"
-              class="btn btn-outline-info btn-sm rounded-3" style="font-size:0.78rem;">
-              <i class="bi bi-image me-1"></i>Cek Foto
-            </a>
+          {% set proof = order.bukti_bayar_url or order.proof_image_url %}
+          {% if proof %}
+            <button type="button" class="btn btn-outline-info btn-sm rounded-3" style="font-size:0.78rem;"
+              onclick="showProofModal('{{ proof }}', '{{ order.id }}')">
+              <i class="bi bi-image me-1"></i>Lihat Bukti
+            </button>
           {% else %}
-            <span style="color:#444; font-size:0.8rem;">Tidak ada</span>
+            <span style="color:#555; font-size:0.8rem;">Belum upload</span>
           {% endif %}
         </td>
         <td>
@@ -69,6 +70,30 @@
       </td></tr>
       {% endfor %}
     </tbody>
-  </table>
+<!-- MODAL BUKTI BAYAR -->
+<div class="modal fade" id="proofModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark border-secondary">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title text-white fw-bold" style="font-size:0.95rem;">Verifikasi Bukti Pembayaran</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center p-3">
+        <img id="modalProofImg" src="" style="max-width:100%; max-height:450px; border-radius:12px; border:1px solid #333;">
+      </div>
+      <div class="modal-footer border-secondary justify-content-between">
+        <span id="modalOrderInfo" class="text-secondary" style="font-size:0.8rem; font-family:monospace;"></span>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Tutup</button>
+      </div>
+    </div>
+  </div>
 </div>
+
+<script>
+function showProofModal(imgUrl, orderId) {
+  document.getElementById('modalProofImg').src = imgUrl;
+  document.getElementById('modalOrderInfo').textContent = 'Order ID: ' + orderId;
+  new bootstrap.Modal(document.getElementById('proofModal')).show();
+}
+</script>
 {% endblock %}

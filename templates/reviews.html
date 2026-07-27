@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Ulasan & Rating Pembeli{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="text-white fw-bold mb-0">Ulasan & Rating Pembeli</h4>
+    <p class="text-secondary mb-0" style="font-size:0.85rem;">{{ reviews|length }} ulasan tersinkronisasi dari pembeli real</p>
+  </div>
+</div>
+
+<div class="content-card">
+  <table class="table table-hover mb-0">
+    <thead>
+      <tr>
+        <th style="width:70px;">Produk</th>
+        <th>Nama Produk</th>
+        <th>Nama Pembeli</th>
+        <th>Rating Bintang</th>
+        <th>Komentar / Ulasan</th>
+        <th>Tanggal</th>
+        <th class="text-center">Aksi</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in reviews %}
+      <tr>
+        <td>
+          <img src="{{ r.product_info.image_url }}" class="product-img"
+            onerror="this.src='https://via.placeholder.com/56x56/222/555?text=?'">
+        </td>
+        <td>
+          <div class="fw-semibold text-white">{{ r.product_info.name }}</div>
+        </td>
+        <td>
+          <div class="text-white fw-semibold" style="font-size:0.88rem;">{{ r.user_name or 'Pelanggan CHMB' }}</div>
+        </td>
+        <td>
+          <div class="text-warning fw-bold">
+            {% for i in range(r.rating or 5) %}★{% endfor %}
+            <span class="text-white ms-1" style="font-size:0.85rem;">({{ r.rating }}/5)</span>
+          </div>
+        </td>
+        <td>
+          <div class="text-secondary" style="font-size:0.85rem; max-width:320px; line-height:1.4;">
+            "{{ r.comment or 'Tanpa ulasan teks' }}"
+          </div>
+        </td>
+        <td style="font-size:0.78rem; color:#666;">
+          {{ r.created_at[:10] if r.created_at else '-' }}
+        </td>
+        <td class="text-center">
+          <form method="POST" action="{{ url_for('delete_review', review_id=r.id) }}"
+            class="d-inline" onsubmit="return confirm('Hapus ulasan ini?')">
+            <button type="submit" class="btn btn-outline-danger btn-action" title="Hapus Ulasan">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-center text-secondary py-5">
+        <i class="bi bi-star" style="font-size:2rem;"></i>
+        <div class="mt-2">Belum ada ulasan dari pembeli. Ulasan akan otomatis muncul di sini setelah pembeli memberi rating.</div>
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

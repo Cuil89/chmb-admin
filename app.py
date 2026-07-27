@@ -102,14 +102,37 @@ def dashboard():
         recent_orders=recent_orders
     )
 
-# ─── PRODUK ───────────────────────────────────────────────────────────────────
+# ─── PRODUK & DYNAMIC RATING ───────────────────────────────────────────────
 @app.route('/products')
 @login_required
 def products():
     product_list = sb_get('products', {'select': '*', 'order': 'name.asc'})
+    reviews = sb_get('reviews', {'select': '*'})
+
     if not isinstance(product_list, list):
         flash('Error mengambil data produk.', 'danger')
         product_list = []
+    
+    # Calculate dynamic average ratings per product
+    review_map = {}
+    if isinstance(reviews, list):
+        for r in reviews:
+            pid = str(r.get('product_id', ''))
+            if pid not in review_map:
+                review_map[pid] = []
+            if r.get('rating'):
+                review_map[pid].append(float(r['rating']))
+
+    for p in product_list:
+        pid = str(p.get('id', ''))
+        ratings = review_map.get(pid, [])
+        if ratings:
+            p['avg_rating'] = round(sum(ratings) / len(ratings), 1)
+            p['review_count'] = len(ratings)
+        else:
+            p['avg_rating'] = None
+            p['review_count'] = 0
+
     return render_template('products.html', products=product_list)
 
 @app.route('/products/add', methods=['GET', 'POST'])
@@ -168,7 +191,7 @@ def delete_product(product_id):
         flash(f'Gagal menghapus produk: {msg}', 'danger')
     return redirect(url_for('products'))
 
-# ─── PESANAN ──────────────────────────────────────────────────────────────────
+# ─── PESANAN & BUKTI BAYAR ───────────────────────────────────────────────────
 @app.route('/orders')
 @login_required
 def orders():
@@ -188,6 +211,37 @@ def update_order_status(order_id):
     else:
         flash(f'Gagal update status: {msg}', 'danger')
     return redirect(url_for('orders'))
+
+# ─── ULASAN & RATING PEMBELI ────────────────────────────────────────────────
+@app.route('/reviews')
+@login_required
+def reviews():
+    review_list = sb_get('reviews', {'select': '*', 'order': 'created_at.desc'})
+    products = sb_get('products', {'select': 'id, name, image_url'})
+
+    prod_dict = {}
+    if isinstance(products, list):
+        for p in products:
+            prod_dict[str(p['id'])] = p
+
+    if isinstance(review_list, list):
+        for r in review_list:
+            pid = str(r.get('product_id', ''))
+            r['product_info'] = prod_dict.get(pid, {'name': 'Produk dihapus', 'image_url': ''})
+    else:
+        review_list = []
+
+    return render_template('reviews.html', reviews=review_list)
+
+@app.route('/reviews/delete/<review_id>', methods=['POST'])
+@login_required
+def delete_review(review_id):
+    ok, msg = sb_delete('reviews', 'id', review_id)
+    if ok:
+        flash('Ulasan berhasil dihapus.', 'success')
+    else:
+        flash(f'Gagal menghapus ulasan: {msg}', 'danger')
+    return redirect(url_for('reviews'))
 
 # ─── AI AUTO-GENERATE (Gemini) ───────────────────────────────────────────────
 @app.route('/api/ai-generate', methods=['POST'])
