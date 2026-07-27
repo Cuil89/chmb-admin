@@ -315,8 +315,8 @@ Balas HANYA dengan JSON valid (tanpa markdown), format:
   "price": estimasi harga rupiah (angka saja, contoh: 199000)
 }}"""
         try:
-            gemini_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-            gemini_headers = {"Content-Type": "application/json", "X-goog-api-key": GEMINI_KEY}
+            gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}"
+            gemini_headers = {"Content-Type": "application/json"}
             payload = {"contents": [{"parts": [{"text": prompt}]}]}
             g_res = req.post(gemini_url, headers=gemini_headers, json=payload, timeout=10)
             if g_res.ok:
