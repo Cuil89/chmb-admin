@@ -212,10 +212,19 @@ Balas HANYA dengan JSON valid (tidak ada teks lain), format:
 }}"""
 
     try:
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
+        gemini_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+        gemini_headers = {
+            "Content-Type": "application/json",
+            "X-goog-api-key": GEMINI_KEY,
+        }
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        r = req.post(gemini_url, json=payload, timeout=15)
-        r.raise_for_status()
+        r = req.post(gemini_url, headers=gemini_headers, json=payload, timeout=15)
+        
+        if r.status_code == 429:
+            return jsonify({'error': 'Quota API Gemini sedang penuh / terlampaui (Rate Limit / Quota Exceeded). Silakan coba beberapa saat lagi atau ganti API Key di AI Studio.'}), 429
+        elif not r.ok:
+            err_msg = r.json().get('error', {}).get('message', r.text)
+            return jsonify({'error': f'Gemini API Error ({r.status_code}): {err_msg}'}), r.status_code
 
         raw = r.json()['candidates'][0]['content']['parts'][0]['text']
         # Bersihkan markdown code block kalau ada
