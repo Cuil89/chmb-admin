@@ -212,14 +212,22 @@ Balas HANYA dengan JSON valid (tidak ada teks lain), format:
 }}"""
 
     try:
-        gemini_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-        gemini_headers = {
-            "Content-Type": "application/json",
-            "X-goog-api-key": GEMINI_KEY,
-        }
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        r = req.post(gemini_url, headers=gemini_headers, json=payload, timeout=15)
-        
+        models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash"]
+        r = None
+        for m in models_to_try:
+            gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={GEMINI_KEY}"
+            gemini_headers = {"Content-Type": "application/json"}
+            payload = {"contents": [{"parts": [{"text": prompt}]}]}
+            res = req.post(gemini_url, headers=gemini_headers, json=payload, timeout=15)
+            if res.status_code == 200:
+                r = res
+                break
+            elif res.status_code != 404:
+                r = res
+
+        if not r:
+            return jsonify({'error': 'Model Gemini tidak ditemukan.'}), 404
+
         if r.status_code == 429:
             return jsonify({'error': 'Quota API Gemini sedang penuh / terlampaui (Rate Limit / Quota Exceeded). Silakan coba beberapa saat lagi atau ganti API Key di AI Studio.'}), 429
         elif not r.ok:
