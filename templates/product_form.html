@@ -107,20 +107,23 @@
           <div class="col-12">
             <label class="form-label text-secondary fw-semibold" style="font-size:0.8rem;">FOTO PRODUK</label>
             
-            <!-- Upload File / Drag & Drop -->
-            <div class="p-3 mb-2 rounded-3 text-center" style="background:#141414; border:2px dashed #333; cursor:pointer;" onclick="document.getElementById('file-input').click()">
-              <i class="bi bi-cloud-arrow-up fs-3 text-secondary"></i>
-              <div class="text-white fw-bold mt-1" style="font-size:0.85rem;">Upload Foto dari Laptop/HP</div>
-              <div class="text-secondary" style="font-size:0.75rem;">Klik di sini untuk pilih file (PNG, JPG, WEBP)</div>
+            <!-- Upload File / Drag & Drop / Ctrl+V Paste Area -->
+            <div class="p-3 mb-2 rounded-3 text-center" style="background:#141414; border:2px dashed #3b82f6; cursor:pointer;" onclick="document.getElementById('file-input').click()">
+              <i class="bi bi-cloud-arrow-up fs-3 text-primary"></i>
+              <div class="text-white fw-bold mt-1" style="font-size:0.85rem;">Upload Foto / Paste Gambar (Ctrl + V)</div>
+              <div class="text-secondary" style="font-size:0.75rem;">Klik di sini untuk pilih file, atau <b>Copy Gambar dari Tokopedia lalu tekan Ctrl+V</b> di mana saja!</div>
               <input type="file" id="file-input" accept="image/*" class="d-none" onchange="handleFileUpload(event)">
             </div>
 
             <!-- Alternative URL -->
-            <div class="input-group mb-2">
-              <span class="input-group-text bg-dark border-secondary text-secondary" style="font-size:0.8rem;">Link URL</span>
+            <div class="input-group mb-1">
+              <span class="input-group-text bg-dark border-secondary text-secondary" style="font-size:0.8rem;">Link Gambar</span>
               <input type="url" name="image_url" id="f-image" class="form-control"
                 value="{{ product.image_url if product else '' }}"
-                placeholder="https://images.unsplash.com/..." oninput="updatePreview()">
+                placeholder="Paste link gambar Tokopedia / Unsplash di sini..." oninput="updatePreview()">
+            </div>
+            <div class="form-text text-secondary mb-2" style="font-size:0.72rem;">
+              💡 <b>Tips Foto Tokopedia:</b> Klik kanan foto di Tokopedia → pilih <b>"Copy Image Address" (Salin Alamat Gambar)</b> → paste di box atas atau tekan <b>Ctrl + V</b>!
             </div>
 
             <!-- Preset Images Quick Selection -->
@@ -300,6 +303,33 @@ async function importFromURL() {
     setLoading('scrape-btn', 'scrape-btn-text', false, '🔗 Import Data');
   }
 }
+
+// Global Ctrl + V paste listener for images & URLs
+window.addEventListener('paste', e => {
+  const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+  for (let item of items) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) {
+      const blob = item.getAsFile();
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        document.getElementById('f-image').value = evt.target.result;
+        updatePreview();
+      };
+      reader.readAsDataURL(blob);
+      e.preventDefault();
+      return;
+    } else if (item.kind === 'string' && item.type === 'text/plain') {
+      item.getAsString(str => {
+        if (str.startsWith('http://') || str.startsWith('https://') || str.startsWith('data:image/')) {
+          if (str.includes('.jpg') || str.includes('.png') || str.includes('.webp') || str.includes('.jpeg') || str.includes('tokopedia') || str.includes('unsplash')) {
+            document.getElementById('f-image').value = str;
+            updatePreview();
+          }
+        }
+      });
+    }
+  }
+});
 
 // Shortcuts & Init
 document.getElementById('ai-keyword').addEventListener('keydown', e => { if (e.key === 'Enter') generateWithAI(); });

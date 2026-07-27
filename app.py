@@ -310,21 +310,26 @@ def scrape_url():
 
     # ─── FALLBACK: Parse URL via Gemini AI jika Tokopedia blokir ───
     if GEMINI_KEY:
-        slug = url.split('/')[-1].replace('-', ' ').replace('_', ' ')
-        prompt = f"""Kamu adalah asisten e-commerce fashion streetwear. Ekstrak data produk berdasarkan URL/slug e-commerce berikut: "{slug}".
+        raw_slug = url.split('?')[0].split('/')[-1]
+        # Hapus ID numerik acak di akhir slug jika ada
+        slug_clean = re.sub(r'-\d+$', '', raw_slug).replace('-', ' ').replace('_', ' ').title()
+        
+        prompt = f"""Kamu adalah E-commerce Data Extractor profesional. Ekstrak data dari nama produk Tokopedia berikut: "{slug_clean}".
 
-Sediakan salah satu URL gambar streetwear berkualitas tinggi dari Unsplash yang paling cocok:
-- T-Shirt: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
-- Hoodie: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80"
-- Pants: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=800&q=80"
+Aturan:
+1. "name": Buat nama produk yang rapi, bersih, dan profesional (contoh: "CHMB Sweater Hoodie Boxy Double Zipper Oversize").
+2. "description": Buat deskripsi detail dalam Bahasa Indonesia (sebutkan bahan fleece premium, resleting double zipper, gaya boxy fit oversized, dan kenyamanan pemakaian).
+3. "category": Wajib pilih salah satu dari ["T-Shirt", "Hoodie", "Pants"]. Jika ada kata hoodie/sweater/zipper maka "Hoodie".
+4. "price": Jika ada angka harga spesifik di URL gunakan itu, jika tidak tentukan harga realistis (contoh untuk Hoodie CHMB: 349000 atau 842000).
+5. "image_url": "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80" (jika Hoodie) atau foto streetwear yang cocok.
 
-Balas HANYA dengan JSON valid (tanpa markdown), format:
+Balas HANYA dengan JSON valid (tanpa markdown format JSON text saja):
 {{
-  "name": "Nama produk lengkap yang rapi dan profesional",
-  "description": "Deskripsi produk streetwear CHMB yang bagus dan detail 2 kalimat",
-  "category": "T-Shirt" atau "Hoodie" atau "Pants",
-  "price": estimasi harga rupiah realistis (angka saja, contoh: 179000 untuk T-Shirt, 329000 untuk Hoodie),
-  "image_url": "pilih salah satu URL gambar di atas yang paling sesuai dengan kategori"
+  "name": "...",
+  "description": "...",
+  "category": "...",
+  "price": 349000,
+  "image_url": "..."
 }}"""
         try:
             gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}"
