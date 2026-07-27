@@ -267,13 +267,20 @@ def scrape_url():
             text = r.text
             result = {}
 
-            # Extrak Judul Asli
+            # Extrak Judul Asli Lengkap
+            h2_match = re.search(r'##\s*(.*?)(?:\n|\r|$)', text)
             title_match = re.search(r'Title:\s*(.*?)(?:\s*di\s*.*\|\s*Tokopedia|\n)', text, re.IGNORECASE)
-            if title_match:
+            
+            raw_title = ""
+            if h2_match:
+                raw_title = h2_match.group(1).strip()
+            elif title_match:
                 raw_title = title_match.group(1).strip()
-                # Bersihkan kata varian di ujung (misal "- Hitam, S")
-                clean_name = re.sub(r'-\s*[A-Za-z0-9\s,]+$', '', raw_title).strip()
-                result['name'] = clean_name[:120] if clean_name else raw_title[:120]
+
+            if raw_title:
+                # Ambil judul lengkap sebelum varian "- Hitam, S" jika ada
+                full_name = raw_title.split(' - ')[0].strip()
+                result['name'] = full_name[:120]
 
             # Extrak Harga Asli (misal Rp842.200 atau Rp882.200)
             price_matches = re.findall(r'Rp[\s.]*(\d+[\d.]*)', text)
