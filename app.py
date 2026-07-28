@@ -247,15 +247,52 @@ def delete_review(review_id):
 @app.route('/users')
 @login_required
 def users():
-    user_list = sb_get('users', {'select': '*', 'order': 'created_at.desc'})
-    if not isinstance(user_list, list) or len(user_list) == 0:
-        # Default sample users if table is empty
-        user_list = [
-            {'id': 'usr_001', 'name': 'Budi Santoso', 'email': 'budi.santoso@gmail.com', 'role': 'user'},
-            {'id': 'usr_002', 'name': 'Admin CHMB Store', 'email': 'admin@chmb.com', 'role': 'admin'},
-            {'id': 'usr_003', 'name': 'Siti Rahma', 'email': 'siti.rahma@gmail.com', 'role': 'user'},
-            {'id': 'usr_004', 'name': 'Tamu Pengunjung', 'email': 'tamu@chmb.com', 'role': 'tamu'},
-        ]
+    user_list = []
+
+    # 1. Ambil dari tabel users (data yang sudah disimpan mobile app)
+    db_users = sb_get('users', {'select': '*', 'order': 'created_at.desc'})
+    if isinstance(db_users, list):
+        user_list = db_users
+
+    # 2. Ambil juga dari Supabase Auth Admin API (semua user yang pernah daftar)
+    #    pakai service_role key kalau ada, atau anon key sebagai fallback
+    service_key = os.environ.get("SUPABASE_SERVICE_KEY", SUPABASE_KEY)
+    try:
+        auth_headers = {
+            "apikey": service_key,
+            "Authorization": f"Bearer {service_key}",
+        }
+        auth_res = req.get(
+            f"{SUPABASE_URL}/auth/v1/admin/users",
+            headers=auth_headers,
+            params={"per_page": 100}
+        )
+        if auth_res.ok:
+            auth_data = auth_res.json()
+            auth_users = auth_data.get('users', []) if isinstance(auth_data, dict) else []
+            existing_emails = {u.get('email', '').lower() for u in user_list}
+
+            for au in auth_users:
+                email = (au.get('email') or '').lower()
+                if email and email not in existing_emails:
+                    # User ada di Auth tapi belum di tabel users — tambahkan ke list
+                    meta = au.get('user_metadata') or {}
+                    user_list.append({
+                        'id': au.get('id'),
+                        'name': meta.get('full_name') or email.split('@')[0].capitalize(),
+                        'email': email,
+                        'role': meta.get('role', 'user'),
+                        'status': 'Auth Only (belum di tabel users)',
+                        'created_at': au.get('created_at', ''),
+                    })
+                    existing_emails.add(email)
+    except Exception as e:
+        print(f"Auth API fetch error: {e}")
+
+    # 3. Jika masih kosong, tampilkan pesan kosong (BUKAN hardcoded dummy)
+    if not user_list:
+        flash('Belum ada pengguna terdaftar di Supabase. Coba daftar akun baru di mobile app.', 'info')
+
     return render_template('users.html', users=user_list)
 
 @app.route('/users/update-role/<user_id>', methods=['POST'])
