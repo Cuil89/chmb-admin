@@ -437,6 +437,11 @@ def scrape_url():
         return jsonify({'error': 'Masukkan URL produk yang valid.'}), 400
 
     result = {}
+    bad_keywords = ['logo', 'icon', 'zeus', 'shop', 'merchant', 'seller', 'badge', 'banner', 'header', 'branding', 'store', 'avatar', 'profile', 'nda', 'nowdoaction', 'tokopedia-static']
+
+    def is_product_img(img_url):
+        u = img_url.lower()
+        return not any(b in u for b in bad_keywords)
 
     # 1. Coba Scraping Direct Meta Tags (og:image & og:title) dari URL
     try:
@@ -448,7 +453,7 @@ def scrape_url():
         d_res = req.get(url, headers=direct_headers, timeout=8)
         if d_res.ok:
             soup = BeautifulSoup(d_res.text, 'html.parser')
-            # Extract og:image
+            # Extract og:image jika bukan logo toko
             og_img = (
                 soup.find('meta', property='og:image') or
                 soup.find('meta', attrs={'name': 'og:image'}) or
@@ -456,7 +461,7 @@ def scrape_url():
             )
             if og_img and og_img.get('content'):
                 img_src = og_img['content'].strip()
-                if img_src.startswith('http'):
+                if img_src.startswith('http') and is_product_img(img_src):
                     result['image_url'] = img_src
 
             # Extract og:title
@@ -502,14 +507,14 @@ def scrape_url():
                         result['price'] = int(clean_p)
                         break
 
-            # Extrak Gambar High-Res Asli Tokopedia dari CDN Jina jika belum dapat
-            if not result.get('image_url'):
+            # Extrak Gambar High-Res Asli Tokopedia dari CDN Jina jika belum dapat / atau dapat logo toko
+            if not result.get('image_url') or not is_product_img(result.get('image_url', '')):
                 tokopedia_imgs = re.findall(r'https://images\.tokopedia\.net/img/cache/[^\s\)\"\']+', text)
                 if not tokopedia_imgs:
                     tokopedia_imgs = re.findall(r'https://[^\s\)\"\']*(?:tokopedia|unsplash)[^\s\)\"\']*\.(?:jpg|jpeg|png|webp)[^\s\)\"\']*', text, re.IGNORECASE)
 
                 for img in tokopedia_imgs:
-                    if 'logo' not in img.lower() and 'icon' not in img.lower() and 'zeus' not in img.lower():
+                    if is_product_img(img):
                         result['image_url'] = img
                         break
     except Exception as e:
