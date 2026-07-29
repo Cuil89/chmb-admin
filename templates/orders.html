@@ -44,16 +44,17 @@
         <td>
           {% set s = order.status %}
           <span class="badge-status
-            {% if s == 'Pending' %}badge-pending
+            {% if s == 'Menunggu Pembayaran' or s == 'Pending' %}badge-pending
             {% elif s == 'Diproses' %}badge-diproses
             {% elif s == 'Dikirim' %}badge-dikirim
+            {% elif s == 'Dibatalkan' %}bg-danger text-white
             {% else %}badge-selesai{% endif %}">{{ s }}</span>
         </td>
         <td class="text-center">
           <form method="POST" action="{{ url_for('update_order_status', order_id=order.id) }}" class="d-flex gap-2 justify-content-center">
             <select name="status" class="form-select form-select-sm rounded-3"
-              style="background:#222; border-color:#333; color:#fff; font-size:0.8rem; width:130px;">
-              {% for status in ['Pending', 'Diproses', 'Dikirim', 'Selesai'] %}
+              style="background:#222; border-color:#333; color:#fff; font-size:0.8rem; width:150px;">
+              {% for status in ['Menunggu Pembayaran', 'Diproses', 'Dikirim', 'Selesai', 'Dibatalkan'] %}
                 <option value="{{ status }}" {{ 'selected' if order.status == status else '' }}>{{ status }}</option>
               {% endfor %}
             </select>
