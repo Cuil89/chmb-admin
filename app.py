@@ -59,10 +59,14 @@ def login():
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
+        # Honeypot anti-bot check
+        if request.form.get('website'):
+            return redirect(url_for('login'))
         username = request.form.get('username')
         password = request.form.get('password')
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             session['admin_logged_in'] = True
+            session.permanent = True
             flash('Login berhasil! Selamat datang di CHMB Admin.', 'success')
             return redirect(url_for('dashboard'))
         else:
@@ -322,6 +326,44 @@ def add_user():
         flash(f'Pengguna "{name}" ({role.upper()}) berhasil ditambahkan!', 'success')
     else:
         flash(f'Pengguna "{name}" ({role.upper()}) berhasil dibuat!', 'success')
+    return redirect(url_for('users'))
+
+@app.route('/users/delete/<user_id>', methods=['POST'])
+@login_required
+def delete_user(user_id):
+    """Hapus pengguna dari public.users table DAN Supabase Auth."""
+    service_key = os.environ.get("SUPABASE_SERVICE_KEY", SUPABASE_KEY)
+    auth_headers = {
+        "apikey": service_key,
+        "Authorization": f"Bearer {service_key}",
+        "Content-Type": "application/json",
+    }
+
+    deleted_from_table = False
+    deleted_from_auth = False
+
+    # 1. Hapus dari tabel public.users
+    ok_table, _ = sb_delete('users', 'id', user_id)
+    if ok_table:
+        deleted_from_table = True
+
+    # 2. Hapus dari Supabase Auth (butuh service_role key)
+    try:
+        auth_del = req.delete(
+            f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}",
+            headers=auth_headers,
+            timeout=10
+        )
+        if auth_del.ok:
+            deleted_from_auth = True
+    except Exception as e:
+        print(f"Auth delete error: {e}")
+
+    if deleted_from_table or deleted_from_auth:
+        flash('Pengguna berhasil dihapus dari sistem.', 'success')
+    else:
+        flash('Gagal menghapus pengguna. Pastikan SUPABASE_SERVICE_KEY sudah diset.', 'danger')
+
     return redirect(url_for('users'))
 
 # ─── AI AUTO-GENERATE (Gemini) ───────────────────────────────────────────────

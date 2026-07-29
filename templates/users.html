@@ -20,7 +20,7 @@
                     <th>Email</th>
                     <th>Role Saat Ini</th>
                     <th>Status ID</th>
-                    <th class="text-end pe-4">Aksi Role</th>
+                    <th class="text-end pe-4">Aksi</th>
                 </tr>
             </thead>
             <tbody>
@@ -61,15 +61,24 @@
                         </span>
                     </td>
                     <td class="text-end pe-4">
-                        <form action="{{ url_for('update_user_role', user_id=u.id) }}" method="POST" class="d-inline-flex gap-2">
-                            <select name="role" class="form-select form-select-sm bg-card text-white border-theme rounded-3" style="width: 140px;">
-                                <option value="user" {% if u.role != 'admin' %}selected{% endif %}>Pembeli (User)</option>
-                                <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin Console</option>
-                            </select>
-                            <button type="submit" class="btn btn-sm btn-outline-light rounded-3">
-                                <i class="bi bi-save me-1"></i> Ubah
+                        <div class="d-inline-flex gap-2 align-items-center">
+                            <form action="{{ url_for('update_user_role', user_id=u.id) }}" method="POST" class="d-inline-flex gap-2">
+                                <select name="role" class="form-select form-select-sm bg-card text-white border-theme rounded-3" style="width: 130px;">
+                                    <option value="user" {% if u.role != 'admin' %}selected{% endif %}>Pembeli (User)</option>
+                                    <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin Console</option>
+                                </select>
+                                <button type="submit" class="btn btn-sm btn-outline-light rounded-3" title="Ubah Role">
+                                    <i class="bi bi-save"></i>
+                                </button>
+                            </form>
+                            <!-- Tombol Hapus -->
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-3"
+                                title="Hapus pengguna"
+                                onclick="confirmDelete('{{ u.id }}', '{{ u.name }}', '{{ u.email }}')"
+                            >
+                                <i class="bi bi-trash3"></i>
                             </button>
-                        </form>
+                        </div>
                     </td>
                 </tr>
                 {% else %}
@@ -121,4 +130,49 @@
         </div>
     </div>
 </div>
+<!-- Modal Konfirmasi Hapus -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-surface text-white border-theme rounded-4">
+            <div class="modal-header border-bottom border-theme">
+                <h5 class="modal-title fw-bold text-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> Hapus Pengguna
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-secondary mb-2" style="font-size:0.9rem;">Kamu akan menghapus pengguna:</p>
+                <div class="d-flex align-items-center gap-3 p-3" style="background:#1a1a1a; border-radius:12px; border:1px solid #2a2a2a;">
+                    <div class="rounded-circle bg-danger d-flex align-items-center justify-content-center fw-bold text-white" style="width:42px;height:42px;" id="deleteAvatar">?</div>
+                    <div>
+                        <h6 class="mb-0 fw-bold" id="deleteName">-</h6>
+                        <small class="text-secondary" id="deleteEmail">-</small>
+                    </div>
+                </div>
+                <div class="alert alert-danger mt-3 rounded-3 py-2 px-3" style="font-size:0.82rem;">
+                    <i class="bi bi-exclamation-circle me-1"></i>
+                    <strong>Tindakan ini tidak dapat dibatalkan!</strong> Data pengguna akan dihapus permanen dari sistem dan database Supabase.
+                </div>
+            </div>
+            <div class="modal-footer border-top border-theme">
+                <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Batal</button>
+                <form id="deleteForm" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-danger rounded-3 fw-bold">
+                        <i class="bi bi-trash3-fill me-1"></i> Ya, Hapus Pengguna
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDelete(userId, userName, userEmail) {
+    document.getElementById('deleteName').textContent = userName;
+    document.getElementById('deleteEmail').textContent = userEmail;
+    document.getElementById('deleteAvatar').textContent = userName.charAt(0).toUpperCase();
+    document.getElementById('deleteForm').action = '/users/delete/' + userId;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
 {% endblock %}
