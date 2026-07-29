@@ -295,6 +295,12 @@ async function generateWithAI() {
 
   if (!keyword) { errEl.textContent = 'Tulis kata kunci produk dulu.'; errEl.style.display = ''; return; }
 
+  // Jika user menempelkan URL di tab AI Generate, alihkan otomatis ke importFromURL
+  if (keyword.startsWith('http://') || keyword.startsWith('https://')) {
+    document.getElementById('scrape-url').value = keyword;
+    return importFromURL();
+  }
+
   setLoading('ai-btn', 'ai-btn-text', true);
   try {
     const res = await fetch('/api/ai-generate', {

@@ -436,61 +436,111 @@ def scrape_url():
     if not url:
         return jsonify({'error': 'Masukkan URL produk yang valid.'}), 400
 
-    # 1. Coba pake Jina AI Reader (rendering headless browser Tokopedia)
+    result = {}
+
+    # 1. Coba Scraping Direct Meta Tags (og:image & og:title) dari URL
+    try:
+        direct_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+        }
+        d_res = req.get(url, headers=direct_headers, timeout=8)
+        if d_res.ok:
+            soup = BeautifulSoup(d_res.text, 'html.parser')
+            # Extract og:image
+            og_img = (
+                soup.find('meta', property='og:image') or
+                soup.find('meta', attrs={'name': 'og:image'}) or
+                soup.find('meta', property='twitter:image')
+            )
+            if og_img and og_img.get('content'):
+                img_src = og_img['content'].strip()
+                if img_src.startswith('http'):
+                    result['image_url'] = img_src
+
+            # Extract og:title
+            og_title = (
+                soup.find('meta', property='og:title') or
+                soup.find('meta', attrs={'name': 'og:title'}) or
+                soup.find('title')
+            )
+            if og_title:
+                t_val = og_title.get('content') or og_title.text or ''
+                t_clean = t_val.split(' - ')[0].split(' | ')[0].strip()
+                if t_clean and len(t_clean) > 3:
+                    result['name'] = t_clean[:120]
+    except Exception as e:
+        print(f"Direct scrape error: {e}")
+
+    # 2. Coba pake Jina AI Reader jika ada data yang belum lengkap
     try:
         jina_endpoint = f"https://r.jina.ai/{url}"
         r = req.get(jina_endpoint, timeout=12)
         if r.ok and len(r.text) > 500:
             text = r.text
-            result = {}
 
-            # Extrak Judul Asli Lengkap
-            h2_match = re.search(r'##\s*(.*?)(?:\n|\r|$)', text)
-            title_match = re.search(r'Title:\s*(.*?)(?:\s*di\s*.*\|\s*Tokopedia|\n)', text, re.IGNORECASE)
-            
-            raw_title = ""
-            if h2_match:
-                raw_title = h2_match.group(1).strip()
-            elif title_match:
-                raw_title = title_match.group(1).strip()
+            # Extrak Judul jika belum ada
+            if not result.get('name'):
+                h2_match = re.search(r'##\s*(.*?)(?:\n|\r|$)', text)
+                title_match = re.search(r'Title:\s*(.*?)(?:\s*di\s*.*\|\s*Tokopedia|\n)', text, re.IGNORECASE)
+                raw_title = ""
+                if h2_match:
+                    raw_title = h2_match.group(1).strip()
+                elif title_match:
+                    raw_title = title_match.group(1).strip()
 
-            if raw_title:
-                # Ambil judul lengkap sebelum varian "- Hitam, S" jika ada
-                full_name = raw_title.split(' - ')[0].strip()
-                result['name'] = full_name[:120]
+                if raw_title:
+                    result['name'] = raw_title.split(' - ')[0].strip()[:120]
 
-            # Extrak Harga Asli (misal Rp842.200 atau Rp882.200)
-            price_matches = re.findall(r'Rp[\s.]*(\d+[\d.]*)', text)
-            for pm in price_matches:
-                clean_p = pm.replace('.', '').replace(',', '')
-                if clean_p.isdigit() and int(clean_p) > 10000:
-                    result['price'] = int(clean_p)
-                    break
+            # Extrak Harga Asli
+            if not result.get('price'):
+                price_matches = re.findall(r'Rp[\s.]*(\d+[\d.]*)', text)
+                for pm in price_matches:
+                    clean_p = pm.replace('.', '').replace(',', '')
+                    if clean_p.isdigit() and int(clean_p) > 10000:
+                        result['price'] = int(clean_p)
+                        break
 
-            # Extrak Gambar High-Res Asli dari Tokopedia CDN
-            img_matches = re.findall(r'https://[^\s\)\"\']+(?:tokopedia-static|tokopedia\.net|aphluv)[^\s\)\"\']*(?:1600|800|700|jpeg|jpg|png|webp)', text, re.IGNORECASE)
-            for img in img_matches:
-                if 'logo' not in img and 'icon' not in img and 'zeus' not in img:
-                    result['image_url'] = img
-                    break
+            # Extrak Gambar High-Res Asli Tokopedia dari CDN Jina jika belum dapat
+            if not result.get('image_url'):
+                tokopedia_imgs = re.findall(r'https://images\.tokopedia\.net/img/cache/[^\s\)\"\']+', text)
+                if not tokopedia_imgs:
+                    tokopedia_imgs = re.findall(r'https://[^\s\)\"\']*(?:tokopedia|unsplash)[^\s\)\"\']*\.(?:jpg|jpeg|png|webp)[^\s\)\"\']*', text, re.IGNORECASE)
 
-            # Tebak Kategori
-            name_lower = (result.get('name') or '').lower()
-            if any(k in name_lower for k in ['hoodie', 'zipper', 'sweater', 'crewneck', 'jaket']):
-                result['category'] = 'Hoodie'
-            elif any(k in name_lower for k in ['pants', 'celana', 'cargo', 'sweatpants', 'jogger']):
-                result['category'] = 'Pants'
-            else:
-                result['category'] = 'T-Shirt'
-
-            # Extrak Deskripsi atau buat deskripsi berbasis nama asli
-            if result.get('name'):
-                result['description'] = f"Produk pilihan {result['name']} original Tokopedia dengan kualitas bahan premium dan jahitan rapi, nyaman dipakai untuk aktivitas sehari-hari."
-                return jsonify(result)
+                for img in tokopedia_imgs:
+                    if 'logo' not in img.lower() and 'icon' not in img.lower() and 'zeus' not in img.lower():
+                        result['image_url'] = img
+                        break
     except Exception as e:
         print(f"Jina scrape error: {e}")
 
-    # 2. FALLBACK ke Gemini AI jika Jina tidak memberikan data
+    # Tebak Kategori & Deskripsi
+    if result.get('name'):
+        name_lower = result['name'].lower()
+        if any(k in name_lower for k in ['hoodie', 'zipper', 'sweater', 'crewneck', 'jaket']):
+            result['category'] = 'Hoodie'
+        elif any(k in name_lower for k in ['pants', 'celana', 'cargo', 'sweatpants', 'jogger']):
+            result['category'] = 'Pants'
+        else:
+            result['category'] = 'T-Shirt'
+
+        if not result.get('description'):
+            result['description'] = f"Rasakan kenyamanan premium dan gaya streetwear tak tertandingi dengan {result['name']}. Terbuat dari bahan berkualitas tinggi yang nyaman dipakai seharian."
+
+        # Kalau gambar masih belum dapat, pakai Unsplash Preset sesuai kategori
+        if not result.get('image_url'):
+            cat = result.get('category', 'T-Shirt')
+            if cat == 'Hoodie':
+                result['image_url'] = 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80'
+            elif cat == 'Pants':
+                result['image_url'] = 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=800&q=80'
+            else:
+                result['image_url'] = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80'
+
+        return jsonify(result)
+
+    # 3. FALLBACK ke Gemini AI jika semua gagal
     if GEMINI_KEY:
         raw_slug = url.split('?')[0].split('/')[-1]
         slug_clean = re.sub(r'-\d+$', '', raw_slug).replace('-', ' ').replace('_', ' ').title()
@@ -502,7 +552,7 @@ Balas HANYA dengan JSON valid (tanpa markdown):
   "name": "{slug_clean}",
   "description": "Deskripsi produk streetwear CHMB premium yang bagus dan detail 2 kalimat",
   "category": "Hoodie",
-  "price": 842000,
+  "price": 299000,
   "image_url": "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80"
 }}"""
         try:
