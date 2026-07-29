@@ -219,15 +219,47 @@ function setPresetImg(type) {
   }
 }
 
+// Compress Image before setting to f-image to prevent "Request Entity Too Large" (Vercel 4.5MB limit)
+function compressAndSetImage(source) {
+  const img = new Image();
+  img.onload = function() {
+    const canvas = document.createElement('canvas');
+    let width = img.width;
+    let height = img.height;
+    const maxDim = 800; // max 800px width/height for fast loading & small payload
+    if (width > maxDim || height > maxDim) {
+      if (width > height) {
+        height = Math.round((height * maxDim) / width);
+        width = maxDim;
+      } else {
+        width = Math.round((width * maxDim) / height);
+        height = maxDim;
+      }
+    }
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, width, height);
+    // Compress to 70% quality JPEG (~50KB - 150KB)
+    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+    document.getElementById('f-image').value = compressedDataUrl;
+    updatePreview();
+  };
+  if (typeof source === 'string') {
+    img.src = source;
+  } else {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(source);
+  }
+}
+
 function handleFileUpload(event) {
   const file = event.target.files[0];
   if (file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      document.getElementById('f-image').value = e.target.result;
-      updatePreview();
-    };
-    reader.readAsDataURL(file);
+    compressAndSetImage(file);
   }
 }
 
@@ -310,21 +342,16 @@ window.addEventListener('paste', e => {
   for (let item of items) {
     if (item.kind === 'file' && item.type.startsWith('image/')) {
       const blob = item.getAsFile();
-      const reader = new FileReader();
-      reader.onload = function(evt) {
-        document.getElementById('f-image').value = evt.target.result;
-        updatePreview();
-      };
-      reader.readAsDataURL(blob);
+      compressAndSetImage(blob);
       e.preventDefault();
       return;
     } else if (item.kind === 'string' && item.type === 'text/plain') {
       item.getAsString(str => {
-        if (str.startsWith('http://') || str.startsWith('https://') || str.startsWith('data:image/')) {
-          if (str.includes('.jpg') || str.includes('.png') || str.includes('.webp') || str.includes('.jpeg') || str.includes('tokopedia') || str.includes('unsplash')) {
-            document.getElementById('f-image').value = str;
-            updatePreview();
-          }
+        if (str.startsWith('data:image/')) {
+          compressAndSetImage(str);
+        } else if (str.startsWith('http://') || str.startsWith('https://')) {
+          document.getElementById('f-image').value = str;
+          updatePreview();
         }
       });
     }
