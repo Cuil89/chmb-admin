@@ -13,34 +13,55 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "chmb-secret-flask-key-2026")
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ubisgngdfdrhdnclfnln.supabase.co")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_publishable_4Hz3bB3u3Kw1kkzboMDhmA_OKL6shMi")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViaXNnbmdkZmRyaGRuY2xmbmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTMxMTYsImV4cCI6MjEwMDQ4OTExNn0.XCjyi0kjimdxiFTCzDydr0KwkiTw2cuYdNhoJxP1_f8")
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "chmb2026")
 GEMINI_KEY = os.environ.get("GEMINI_KEY", "")
 
-HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json",
-    "Prefer": "return=representation",
-}
+def get_headers():
+    key = os.environ.get("SUPABASE_KEY", SUPABASE_KEY)
+    return {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
 
 # ─── Helper Supabase REST ─────────────────────────────────────────────────────
 def sb_get(table, params=None):
-    r = req.get(f"{SUPABASE_URL}/rest/v1/{table}", headers=HEADERS, params=params)
-    return r.json() if r.ok else []
+    try:
+        r = req.get(f"{SUPABASE_URL}/rest/v1/{table}", headers=get_headers(), params=params)
+        if r.ok:
+            return r.json()
+        print(f"⚠️ sb_get({table}) failed: {r.status_code} - {r.text}")
+    except Exception as e:
+        print(f"❌ sb_get({table}) exception: {e}")
+    return []
 
 def sb_insert(table, data):
-    r = req.post(f"{SUPABASE_URL}/rest/v1/{table}", headers=HEADERS, json=data)
-    return r.ok, r.text
+    try:
+        r = req.post(f"{SUPABASE_URL}/rest/v1/{table}", headers=get_headers(), json=data)
+        if not r.ok:
+            print(f"⚠️ sb_insert({table}) failed: {r.status_code} - {r.text}")
+        return r.ok, r.text
+    except Exception as e:
+        return False, str(e)
 
 def sb_update(table, match_col, match_val, data):
-    r = req.patch(f"{SUPABASE_URL}/rest/v1/{table}?{match_col}=eq.{match_val}", headers=HEADERS, json=data)
-    return r.ok, r.text
+    try:
+        r = req.patch(f"{SUPABASE_URL}/rest/v1/{table}?{match_col}=eq.{match_val}", headers=get_headers(), json=data)
+        if not r.ok:
+            print(f"⚠️ sb_update({table}) failed: {r.status_code} - {r.text}")
+        return r.ok, r.text
+    except Exception as e:
+        return False, str(e)
 
 def sb_delete(table, match_col, match_val):
-    r = req.delete(f"{SUPABASE_URL}/rest/v1/{table}?{match_col}=eq.{match_val}", headers=HEADERS)
-    return r.ok, r.text
+    try:
+        r = req.delete(f"{SUPABASE_URL}/rest/v1/{table}?{match_col}=eq.{match_val}", headers=get_headers())
+        return r.ok, r.text
+    except Exception as e:
+        return False, str(e)
 
 # ─── Decorator: Wajib Login ───────────────────────────────────────────────────
 def login_required(f):
