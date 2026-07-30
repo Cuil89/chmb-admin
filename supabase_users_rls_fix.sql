@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS public.transactions (
 );
 
 -- Tambah kolom jika tabel transaksi sudah ada tapi belum ada kolom-kolomnya
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS order_ref text;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS total_harga numeric;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS alamat text;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS courier text;
