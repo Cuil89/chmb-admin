@@ -12,6 +12,12 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "chmb-secret-flask-key-2026")
 
+from reviews import reviews_bp
+app.register_blueprint(reviews_bp)
+
+from profile import profile_bp
+app.register_blueprint(profile_bp)
+
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ubisgngdfdrhdnclfnln.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViaXNnbmdkZmRyaGRuY2xmbmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTMxMTYsImV4cCI6MjEwMDQ4OTExNn0.XCjyi0kjimdxiFTCzDydr0KwkiTw2cuYdNhoJxP1_f8")
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
@@ -382,19 +388,27 @@ def api_add_review():
 
         rev_obj = {
             'id': rev_id,
-            'product_id': str(data.get('product_id', 'prod_1')),
-            'transaction_id': str(data.get('transaction_id', '')),
+            'product_id': str(data.get('product_id') or 'prod_1'),
+            'user_id': str(data.get('user_id') or '00000000-0000-0000-0000-000000000001'),
+            'order_id': str(data.get('order_id') or data.get('transaction_id') or ''),
+            'transaction_id': str(data.get('order_id') or data.get('transaction_id') or ''),
             'user_name': data.get('user_name', 'Pelanggan CHMB'),
             'rating': int(data.get('rating', 5)),
             'comment': data.get('comment', 'Baju berkualitas sangat bagus! Suka banget.'),
             'created_at': data.get('created_at', '2026-07-30T10:00:00Z')
         }
 
-        # 1. Save in Flask Memory
-        IN_MEMORY_REVIEWS.insert(0, rev_obj)
+        # Cek apakah ulasan serupa sudah ada di memory agar tidak duplikat
+        is_dup = any(
+            str(r.get('product_id')) == str(rev_obj['product_id']) and
+            str(r.get('user_id')) == str(rev_obj['user_id']) and
+            str(r.get('comment', '')).strip() == str(rev_obj['comment']).strip()
+            for r in IN_MEMORY_REVIEWS
+        )
 
-        # 2. Save to Supabase DB via REST
-        sb_insert('reviews', rev_obj)
+        if not is_dup:
+            IN_MEMORY_REVIEWS.insert(0, rev_obj)
+            sb_insert('reviews', rev_obj)
 
         print(f"✅ API Review Added: Product {rev_obj['product_id']} - Rating {rev_obj['rating']} Stars")
         return jsonify({'success': True, 'message': 'Ulasan berhasil disimpan dan disinkronkan!', 'review': rev_obj}), 201
