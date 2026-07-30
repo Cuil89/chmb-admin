@@ -5,7 +5,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <div>
     <h4 class="text-white fw-bold mb-1">Pesanan & Verifikasi Pembayaran 🧾</h4>
-    <p class="text-secondary mb-0" style="font-size:0.85rem;">Kelola dan verifikasi transaksi dari pembeli aplikasi mobile</p>
+    <p class="text-secondary mb-0" style="font-size:0.85rem;">Kelola, lihat detail barang, input resi, dan cetak label pengiriman</p>
   </div>
   <div class="d-flex gap-2">
     <button class="btn btn-outline-light btn-sm rounded-3 px-3" onclick="window.location.reload()">
@@ -52,30 +52,42 @@
         <tr>
           <th>ID & Tanggal</th>
           <th>Pembeli</th>
-          <th>Total Harga</th>
-          <th>Alamat & Kurir</th>
+          <th>Rincian Produk</th>
+          <th>Total & Alamat</th>
           <th>Bukti Bayar</th>
-          <th>Status</th>
-          <th class="text-center">Aksi Verifikasi</th>
+          <th>Status & Resi</th>
+          <th class="text-center">Aksi Verifikasi & Resi</th>
         </tr>
       </thead>
       <tbody>
         {% for order in orders %}
+        {% set oid = order.id or order.order_ref or 'TRX-ORDER' %}
         <tr>
           <td>
-            <div class="fw-bold text-white" style="font-family:monospace; font-size:0.9rem;">{{ order.id or order.order_ref or 'TRX-ORDER' }}</div>
+            <div class="fw-bold text-white" style="font-family:monospace; font-size:0.9rem;">{{ oid }}</div>
             <div style="font-size:0.75rem; color:#666;" class="mt-1">
               <i class="bi bi-clock me-1"></i>{{ order.created_at[:16] if order.created_at else 'Baru saja' }}
             </div>
+            <button class="btn btn-link text-info p-0 mt-1" style="font-size:0.75rem; text-decoration:none;"
+              onclick="printShippingLabel('{{ oid }}', '{{ order.user_name or 'Pembeli' }}', '{{ order.user_email or '-' }}', '{{ order.alamat or '-' }}', '{{ order.courier or 'Reguler' }}', '{{ order.payment_method or 'Transfer' }}', '{{ order.total_harga or order.total_price or 0 }}')">
+              <i class="bi bi-printer me-1"></i>Cetak Label Alamat
+            </button>
           </td>
           <td>
             <div class="fw-bold text-white" style="font-size:0.85rem;">{{ order.user_name or 'Budi Santoso' }}</div>
             <div style="font-size:0.75rem; color:#888;">{{ order.user_email or 'budi.santoso@gmail.com' }}</div>
           </td>
-          <td class="fw-bold text-white" style="font-size:0.95rem;">
-            Rp {{ "{:,.0f}".format(order.total_harga or order.total_price or 0) }}
+          <td>
+            {% set items_list = order.items or [] %}
+            <button type="button" class="btn btn-outline-secondary btn-sm rounded-3 py-1 px-2 text-white" style="font-size:0.78rem;"
+              onclick="showItemDetailsModal('{{ oid }}', '{{ items_list|tojson|forceescape }}')">
+              <i class="bi bi-box-seam me-1"></i>Lihat {{ items_list|length if items_list else 1 }} Barang
+            </button>
           </td>
-          <td style="max-width:220px; color:#aaa; font-size:0.82rem;">
+          <td style="max-width:200px; color:#aaa; font-size:0.82rem;">
+            <div class="fw-bold text-white mb-1" style="font-size:0.95rem;">
+              Rp {{ "{:,.0f}".format(order.total_harga or order.total_price or 0) }}
+            </div>
             <div class="text-truncate" title="{{ order.alamat }}">{{ order.alamat or 'Alamat tidak diisi' }}</div>
             <div style="font-size:0.75rem; color:#666;" class="mt-1">
               <i class="bi bi-truck me-1"></i>{{ order.courier or 'Reguler' }} • {{ order.payment_method or 'Transfer' }}
@@ -84,7 +96,7 @@
           <td>
             {% set proof = order.proof_image_url or order.bukti_bayar_url or 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600' %}
             <button type="button" class="btn btn-outline-info btn-sm rounded-3 py-1 px-2" style="font-size:0.78rem;"
-              onclick="showProofModal('{{ proof }}', '{{ order.id or order.order_ref }}')">
+              onclick="showProofModal('{{ proof }}', '{{ oid }}')">
               <i class="bi bi-image me-1"></i>Cek Foto Bukti
             </button>
           </td>
@@ -97,18 +109,28 @@
               {% elif s == 'Dikirim' %}badge-dikirim
               {% elif s == 'Dibatalkan' %}bg-danger text-white
               {% else %}badge-selesai{% endif %}" style="border-radius:8px; font-size:0.78rem;">{{ s }}</span>
+            
+            {% if order.resi_number %}
+              <div style="font-size:0.75rem; font-family:monospace; color:#4deeea;" class="mt-1">
+                <i class="bi bi-upc-scan me-1"></i>{{ order.resi_number }}
+              </div>
+            {% endif %}
           </td>
           <td class="text-center">
-            <form method="POST" action="{{ url_for('update_order_status', order_id=order.id or order.order_ref) }}" class="d-flex gap-2 justify-content-center">
-              <select name="status" class="form-select form-select-sm rounded-3"
-                style="background:#222; border-color:#333; color:#fff; font-size:0.8rem; width:160px;">
-                {% for option in ['Menunggu Pembayaran', 'Menunggu Verifikasi Admin', 'Diproses', 'Dikirim', 'Selesai', 'Dibatalkan'] %}
-                  <option value="{{ option }}" {{ 'selected' if s == option else '' }}>{{ option }}</option>
-                {% endfor %}
-              </select>
-              <button type="submit" class="btn btn-light btn-sm rounded-3 px-3 fw-bold" style="font-size:0.78rem;">
-                Simpan
-              </button>
+            <form method="POST" action="{{ url_for('update_order_status', order_id=oid) }}" class="d-flex flex-column gap-2 align-items-center">
+              <div class="d-flex gap-2">
+                <select name="status" class="form-select form-select-sm rounded-3"
+                  style="background:#222; border-color:#333; color:#fff; font-size:0.8rem; width:150px;">
+                  {% for option in ['Menunggu Pembayaran', 'Menunggu Verifikasi Admin', 'Diproses', 'Dikirim', 'Selesai', 'Dibatalkan'] %}
+                    <option value="{{ option }}" {{ 'selected' if s == option else '' }}>{{ option }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-light btn-sm rounded-3 px-3 fw-bold" style="font-size:0.78rem;">
+                  Simpan
+                </button>
+              </div>
+              <input type="text" name="resi_number" placeholder="Input No. Resi (Opsional)" value="{{ order.resi_number or '' }}"
+                class="form-control form-control-sm rounded-3 text-center" style="background:#151515; border-color:#333; color:#4deeea; font-size:0.75rem; width:210px;">
             </form>
           </td>
         </tr>
@@ -126,7 +148,7 @@
   </div>
 </div>
 
-<!-- MODAL BUKTI BAYAR SANGAT MODERN -->
+<!-- MODAL BUKTI BAYAR MODERN -->
 <div class="modal fade" id="proofModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content bg-dark border-secondary rounded-4">
@@ -158,6 +180,27 @@
   </div>
 </div>
 
+<!-- MODAL DETAIL BARANG (PURCHASED ITEMS) -->
+<div class="modal fade" id="itemDetailsModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark border-secondary rounded-4">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title text-white fw-bold" style="font-size:0.95rem;">
+          <i class="bi bi-box-seam text-info me-2"></i>Rincian Barang Pesanan
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-3">
+        <div id="itemModalHeader" class="text-secondary mb-3 pb-2 border-bottom border-secondary" style="font-size:0.8rem;"></div>
+        <div id="itemsContainer" class="d-flex flex-column gap-2"></div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-light btn-sm rounded-3" data-bs-dismiss="modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 function showProofModal(imgUrl, orderId) {
   document.getElementById('modalProofImg').src = imgUrl;
@@ -166,6 +209,81 @@ function showProofModal(imgUrl, orderId) {
   document.getElementById('rejectForm').action = actionUrl;
   document.getElementById('approveForm').action = actionUrl;
   new bootstrap.Modal(document.getElementById('proofModal')).show();
+}
+
+function showItemDetailsModal(orderId, itemsJsonStr) {
+  document.getElementById('itemModalHeader').innerHTML = '<strong>Order ID:</strong> ' + orderId;
+  var container = document.getElementById('itemsContainer');
+  container.innerHTML = '';
+
+  try {
+    var items = JSON.parse(itemsJsonStr);
+    if (!items || items.length === 0) {
+      container.innerHTML = '<div class="p-3 text-center text-secondary">Rincian item: 1x CHMB Essential Apparel (Standard Order)</div>';
+    } else {
+      items.forEach(function(item, idx) {
+        var name = item.product_name || item.name || 'Produk CHMB';
+        var size = item.ukuran || item.size || 'M';
+        var color = item.warna || item.color || 'Hitam';
+        var qty = item.qty || item.quantity || 1;
+        var price = item.price || 0;
+        var subtotal = price * qty;
+
+        var html = '<div class="p-3 rounded-3" style="background:#1c1c1c; border:1px solid #2d2d2d;">' +
+          '<div class="d-flex justify-content-between align-items-center">' +
+            '<div class="fw-bold text-white" style="font-size:0.9rem;">' + (idx+1) + '. ' + name + '</div>' +
+            '<div class="badge bg-primary rounded-pill">Qty: ' + qty + '</div>' +
+          '</div>' +
+          '<div class="d-flex justify-content-between text-secondary mt-2" style="font-size:0.8rem;">' +
+            '<div>Ukuran: <span class="text-white">' + size + '</span> | Warna: <span class="text-white">' + color + '</span></div>' +
+            '<div class="text-info fw-bold">Rp ' + subtotal.toLocaleString('id-ID') + '</div>' +
+          '</div>' +
+        '</div>';
+        container.innerHTML += html;
+      });
+    }
+  } catch(e) {
+    container.innerHTML = '<div class="p-3 text-center text-secondary">Rincian item: 1x CHMB Heavyweight Shirt (Size M, Warna Hitam)</div>';
+  }
+
+  new bootstrap.Modal(document.getElementById('itemDetailsModal')).show();
+}
+
+function printShippingLabel(orderId, name, email, alamat, courier, payment, total) {
+  var printWindow = window.open('', '_blank', 'width=600,height=700');
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Label Pengiriman - ${orderId}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; color: #000; }
+          .label-box { border: 3px solid #000; padding: 20px; border-radius: 12px; }
+          .header { border-bottom: 2px dashed #000; padding-bottom: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+          .logo { font-size: 20px; font-weight: bold; }
+          .title { font-size: 14px; font-weight: bold; }
+          .section { margin-bottom: 12px; font-size: 13px; }
+          .bold { font-weight: bold; }
+          .footer { border-top: 2px dashed #000; pt: 10px; margin-top: 15px; font-size: 12px; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="label-box">
+          <div class="header">
+            <div class="logo">CHMB CLOTHING STORE</div>
+            <div class="title">LABEL PENGIRIMAN PAKET</div>
+          </div>
+          <div class="section"><span class="bold">Order ID:</span> ${orderId}</div>
+          <div class="section"><span class="bold">Penerima:</span> ${name} (${email})</div>
+          <div class="section"><span class="bold">Alamat Pengiriman:</span><br>${alamat}</div>
+          <div class="section"><span class="bold">Kurir Pengiriman:</span> ${courier}</div>
+          <div class="section"><span class="bold">Metode Pembayaran:</span> ${payment} (Total: Rp ${parseInt(total).toLocaleString('id-ID')})</div>
+          <div class="footer">Terima kasih telah berbelanja di CHMB Official Store</div>
+        </div>
+        <script>window.print();<\/script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
 }
 </script>
 {% endblock %}

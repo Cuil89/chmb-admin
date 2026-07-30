@@ -254,14 +254,25 @@ def orders():
 @login_required
 def update_order_status(order_id):
     new_status = request.form.get('status')
-    sb_update('transactions', 'id', order_id, {'status': new_status})
+    resi_number = request.form.get('resi_number')
+
+    update_payload = {'status': new_status}
+    if resi_number:
+        update_payload['resi_number'] = resi_number
+
+    sb_update('transactions', 'id', order_id, update_payload)
 
     # Update in memory as well
     for mem_tx in IN_MEMORY_TRANSACTIONS:
         if str(mem_tx.get('id')) == str(order_id):
             mem_tx['status'] = new_status
+            if resi_number:
+                mem_tx['resi_number'] = resi_number
 
-    flash(f'Status pesanan berhasil diubah menjadi "{new_status}"!', 'success')
+    msg = f'Status pesanan berhasil diubah menjadi "{new_status}"'
+    if resi_number:
+        msg += f' dengan No. Resi: {resi_number}'
+    flash(msg, 'success')
     return redirect(url_for('orders'))
 
 # ─── API ENDPOINTS (FOR FLUTTER MOBILE APP SYNC) ──────────────────────────────
