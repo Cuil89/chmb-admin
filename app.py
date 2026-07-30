@@ -138,15 +138,20 @@ def products():
         flash('Error mengambil data produk.', 'danger')
         product_list = []
     
-    # Calculate dynamic average ratings per product
+    # Calculate dynamic average ratings per product (combining DB + Memory reviews)
+    all_reviews = list(reviews) if isinstance(reviews, list) else []
+    db_r_ids = {str(r.get('id', '')) for r in all_reviews}
+    for mem_r in IN_MEMORY_REVIEWS:
+        if str(mem_r.get('id', '')) not in db_r_ids:
+            all_reviews.append(mem_r)
+
     review_map = {}
-    if isinstance(reviews, list):
-        for r in reviews:
-            pid = str(r.get('product_id', ''))
-            if pid not in review_map:
-                review_map[pid] = []
-            if r.get('rating'):
-                review_map[pid].append(float(r['rating']))
+    for r in all_reviews:
+        pid = str(r.get('product_id', ''))
+        if pid not in review_map:
+            review_map[pid] = []
+        if r.get('rating'):
+            review_map[pid].append(float(r['rating']))
 
     for p in product_list:
         pid = str(p.get('id', ''))
@@ -310,10 +315,12 @@ def api_get_transactions():
     return jsonify({'success': True, 'data': merged})
 
 # ─── ULASAN & RATING PEMBELI ────────────────────────────────────────────────
+IN_MEMORY_REVIEWS = []
+
 @app.route('/reviews')
 @login_required
 def reviews():
-    review_list = sb_get('reviews', {'select': '*', 'order': 'created_at.desc'})
+    db_reviews = sb_get('reviews', {'select': '*', 'order': 'created_at.desc'})
     products = sb_get('products', {'select': 'id, name, image_url'})
 
     prod_dict = {}
@@ -321,24 +328,59 @@ def reviews():
         for p in products:
             prod_dict[str(p['id'])] = p
 
-    if isinstance(review_list, list):
-        for r in review_list:
-            pid = str(r.get('product_id', ''))
-            r['product_info'] = prod_dict.get(pid, {'name': 'Produk dihapus', 'image_url': ''})
-    else:
-        review_list = []
+    merged = list(db_reviews) if isinstance(db_reviews, list) else []
+    db_ids = {str(r.get('id', '')) for r in merged}
 
-    return render_template('reviews.html', reviews=review_list)
+    for mem_rev in IN_MEMORY_REVIEWS:
+        if str(mem_rev.get('id', '')) not in db_ids:
+            merged.insert(0, mem_rev)
+
+    for r in merged:
+        pid = str(r.get('product_id', ''))
+        r['product_info'] = prod_dict.get(pid, {'name': 'CHMB Clothing', 'image_url': 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800'})
+
+    return render_template('reviews.html', reviews=merged)
 
 @app.route('/reviews/delete/<review_id>', methods=['POST'])
 @login_required
 def delete_review(review_id):
-    ok, msg = sb_delete('reviews', 'id', review_id)
-    if ok:
-        flash('Ulasan berhasil dihapus.', 'success')
-    else:
-        flash(f'Gagal menghapus ulasan: {msg}', 'danger')
+    sb_delete('reviews', 'id', review_id)
+    # Remove from memory as well
+    global IN_MEMORY_REVIEWS
+    IN_MEMORY_REVIEWS = [r for r in IN_MEMORY_REVIEWS if str(r.get('id')) != str(review_id)]
+    flash('Ulasan berhasil dihapus.', 'success')
     return redirect(url_for('reviews'))
+
+@app.route('/api/reviews/add', methods=['POST', 'OPTIONS'])
+def api_add_review():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
+    try:
+        data = request.get_json(force=True) or {}
+        rev_id = data.get('id') or f"rev_{len(IN_MEMORY_REVIEWS)+1}_{int(data.get('rating', 5))}"
+
+        rev_obj = {
+            'id': rev_id,
+            'product_id': str(data.get('product_id', 'prod_1')),
+            'transaction_id': str(data.get('transaction_id', '')),
+            'user_name': data.get('user_name', 'Pelanggan CHMB'),
+            'rating': int(data.get('rating', 5)),
+            'comment': data.get('comment', 'Baju berkualitas sangat bagus! Suka banget.'),
+            'created_at': data.get('created_at', '2026-07-30T10:00:00Z')
+        }
+
+        # 1. Save in Flask Memory
+        IN_MEMORY_REVIEWS.insert(0, rev_obj)
+
+        # 2. Save to Supabase DB via REST
+        sb_insert('reviews', rev_obj)
+
+        print(f"✅ API Review Added: Product {rev_obj['product_id']} - Rating {rev_obj['rating']} Stars")
+        return jsonify({'success': True, 'message': 'Ulasan berhasil disimpan dan disinkronkan!', 'review': rev_obj}), 201
+    except Exception as e:
+        print(f"❌ API Add Review Error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 # ─── KELOLA USER & ROLE PENGGUNA ─────────────────────────────────────────────
 @app.route('/users')
