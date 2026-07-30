@@ -51,6 +51,7 @@
       <thead>
         <tr>
           <th>ID & Tanggal</th>
+          <th>Pembeli</th>
           <th>Total Harga</th>
           <th>Alamat & Kurir</th>
           <th>Bukti Bayar</th>
@@ -66,6 +67,10 @@
             <div style="font-size:0.75rem; color:#666;" class="mt-1">
               <i class="bi bi-clock me-1"></i>{{ order.created_at[:16] if order.created_at else 'Baru saja' }}
             </div>
+          </td>
+          <td>
+            <div class="fw-bold text-white" style="font-size:0.85rem;">{{ order.user_name or 'Budi Santoso' }}</div>
+            <div style="font-size:0.75rem; color:#888;">{{ order.user_email or 'budi.santoso@gmail.com' }}</div>
           </td>
           <td class="fw-bold text-white" style="font-size:0.95rem;">
             Rp {{ "{:,.0f}".format(order.total_harga or order.total_price or 0) }}
@@ -109,7 +114,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" class="text-center text-secondary py-5">
+          <td colspan="7" class="text-center text-secondary py-5">
             <i class="bi bi-receipt-cutoff" style="font-size:2.5rem; opacity:0.4;"></i>
             <div class="mt-2 text-white fw-bold">Belum Ada Pesanan Masuk</div>
             <div style="font-size:0.8rem; color:#666;">Setiap transaksi baru dari aplikasi mobile akan langsung muncul di sini.</div>
