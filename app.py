@@ -216,26 +216,98 @@ def delete_product(product_id):
         flash(f'Gagal menghapus produk: {msg}', 'danger')
     return redirect(url_for('products'))
 
+# ─── IN-MEMORY TRANSACTIONS FALLBACK ──────────────────────────────────────────
+IN_MEMORY_TRANSACTIONS = []
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PATCH, DELETE'
+    return response
+
 # ─── PESANAN & BUKTI BAYAR ───────────────────────────────────────────────────
 @app.route('/orders')
 @login_required
 def orders():
-    order_list = sb_get('transactions', {'select': '*', 'order': 'created_at.desc'})
-    if not isinstance(order_list, list):
-        flash('Error mengambil data pesanan.', 'danger')
-        order_list = []
-    return render_template('orders.html', orders=order_list)
+    db_orders = sb_get('transactions', {'select': '*', 'order': 'created_at.desc'})
+    if not isinstance(db_orders, list):
+        db_orders = []
+
+    # Merge with IN_MEMORY_TRANSACTIONS (eliminating duplicates by id or display id)
+    merged = list(db_orders)
+    db_ids = {str(o.get('id', '')) for o in db_orders}
+    
+    for mem_tx in IN_MEMORY_TRANSACTIONS:
+        mem_id = str(mem_tx.get('id', ''))
+        if mem_id not in db_ids:
+            merged.insert(0, mem_tx)
+
+    return render_template('orders.html', orders=merged)
 
 @app.route('/orders/update-status/<order_id>', methods=['POST'])
 @login_required
 def update_order_status(order_id):
     new_status = request.form.get('status')
-    ok, msg = sb_update('transactions', 'id', order_id, {'status': new_status})
-    if ok:
-        flash(f'Status pesanan berhasil diubah menjadi "{new_status}"!', 'success')
-    else:
-        flash(f'Gagal update status: {msg}', 'danger')
+    sb_update('transactions', 'id', order_id, {'status': new_status})
+
+    # Update in memory as well
+    for mem_tx in IN_MEMORY_TRANSACTIONS:
+        if str(mem_tx.get('id')) == str(order_id):
+            mem_tx['status'] = new_status
+
+    flash(f'Status pesanan berhasil diubah menjadi "{new_status}"!', 'success')
     return redirect(url_for('orders'))
+
+# ─── API ENDPOINTS (FOR FLUTTER MOBILE APP SYNC) ──────────────────────────────
+@app.route('/api/transactions/create', methods=['POST', 'OPTIONS'])
+def api_create_transaction():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
+    try:
+        data = request.get_json(force=True) or {}
+        tx_id = data.get('id') or f"TRX-{data.get('timestamp', '000')}"
+        
+        tx_obj = {
+            'id': tx_id,
+            'user_id': data.get('user_id', '00000000-0000-0000-0000-000000000001'),
+            'total_harga': float(data.get('total_harga', 0)),
+            'total_price': float(data.get('total_harga', 0)),
+            'alamat': data.get('alamat', '-'),
+            'courier': data.get('courier', 'Reguler'),
+            'payment_method': data.get('payment_method', 'Transfer Bank'),
+            'proof_image_url': data.get('proof_image_url'),
+            'status': data.get('status', 'Menunggu Verifikasi Admin'),
+            'items': data.get('items', []),
+            'created_at': data.get('created_at', '2026-07-30T09:30:00Z')
+        }
+
+        # 1. Save in Flask Memory
+        IN_MEMORY_TRANSACTIONS.insert(0, tx_obj)
+
+        # 2. Save to Supabase DB via REST
+        sb_insert('transactions', tx_obj)
+
+        print(f"✅ API Transaction Created: {tx_id}")
+        return jsonify({'success': True, 'message': 'Pesanan berhasil disinkronkan ke Web Admin!', 'transaction': tx_obj}), 201
+    except Exception as e:
+        print(f"❌ API Transaction Create Error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/transactions', methods=['GET'])
+def api_get_transactions():
+    db_orders = sb_get('transactions', {'select': '*', 'order': 'created_at.desc'})
+    if not isinstance(db_orders, list):
+        db_orders = []
+    
+    merged = list(db_orders)
+    db_ids = {str(o.get('id', '')) for o in db_orders}
+    for mem_tx in IN_MEMORY_TRANSACTIONS:
+        if str(mem_tx.get('id')) not in db_ids:
+            merged.insert(0, mem_tx)
+
+    return jsonify({'success': True, 'data': merged})
 
 # ─── ULASAN & RATING PEMBELI ────────────────────────────────────────────────
 @app.route('/reviews')
