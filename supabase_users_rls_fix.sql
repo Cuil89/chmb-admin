@@ -5,7 +5,7 @@
 
 -- 1. Tabel Users
 CREATE TABLE IF NOT EXISTS public.users (
-  id uuid PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text,
   email text UNIQUE,
   role text DEFAULT 'user',
@@ -16,9 +16,9 @@ CREATE TABLE IF NOT EXISTS public.users (
 
 -- 2. Tabel Transactions (Lengkap Kolom Alamat & Resi)
 CREATE TABLE IF NOT EXISTS public.transactions (
-  id text PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id text,
-  total_harga numeric,
+  total_harga numeric DEFAULT 0,
   alamat text,
   courier text,
   payment_method text,
@@ -29,15 +29,18 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   created_at timestamptz DEFAULT now()
 );
 
--- Tambah kolom jika tabel transaksi sudah ada tapi belum ada kolom-kolomnya
+-- Tambah kolom jika tabel transaksi sudah ada tapi belum lengkap
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS user_id text;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS order_ref text;
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS total_harga numeric;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS total_harga numeric DEFAULT 0;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS alamat text;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS courier text;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS payment_method text;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS proof_image_url text;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS resi_number text;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS status text DEFAULT 'Menunggu Pembayaran';
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS items jsonb;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 
 -- 3. Kebijakan RLS (Row Level Security) untuk Tabel Users & Transactions
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
