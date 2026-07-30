@@ -248,6 +248,15 @@ def orders():
         if mem_id not in db_ids:
             merged.insert(0, mem_tx)
 
+    for o in merged:
+        items = o.get('items')
+        if not items or not isinstance(items, list):
+            items = []
+        try:
+            o['items_json'] = json.dumps(items)
+        except Exception:
+            o['items_json'] = '[]'
+
     return render_template('orders.html', orders=merged)
 
 @app.route('/orders/update-status/<order_id>', methods=['POST'])
