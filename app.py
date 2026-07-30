@@ -402,6 +402,21 @@ def api_add_review():
         print(f"❌ API Add Review Error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 400
 
+@app.route('/api/reviews', methods=['GET'])
+def api_get_reviews():
+    db_reviews = sb_get('reviews', {'select': '*', 'order': 'created_at.desc'})
+    if not isinstance(db_reviews, list):
+        db_reviews = []
+    
+    merged = list(db_reviews)
+    db_ids = {str(r.get('id', '')) for r in db_reviews}
+
+    for mem_rev in IN_MEMORY_REVIEWS:
+        if str(mem_rev.get('id', '')) not in db_ids:
+            merged.insert(0, mem_rev)
+
+    return jsonify({'success': True, 'data': merged, 'reviews': merged})
+
 # ─── KELOLA USER & ROLE PENGGUNA ─────────────────────────────────────────────
 @app.route('/users')
 @login_required
