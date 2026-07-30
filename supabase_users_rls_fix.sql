@@ -1,9 +1,9 @@
 -- ============================================================
 -- JALANKAN SCRIPT INI DI: Supabase Dashboard > SQL Editor
--- Tujuan: Fix RLS agar mobile app bisa insert/upsert ke tabel users
+-- Tujuan: Setup Tabel Users, Transactions & Storage Bucket Bukti Bayar
 -- ============================================================
 
--- 1. Pastikan tabel users ada dengan kolom yang benar
+-- 1. Tabel Users
 CREATE TABLE IF NOT EXISTS public.users (
   id uuid PRIMARY KEY,
   name text,
@@ -14,33 +14,48 @@ CREATE TABLE IF NOT EXISTS public.users (
   created_at timestamptz DEFAULT now()
 );
 
--- 2. Aktifkan RLS
+-- 2. Tabel Transactions (Lengkap Kolom Alamat & Resi)
+CREATE TABLE IF NOT EXISTS public.transactions (
+  id text PRIMARY KEY,
+  user_id text,
+  total_harga numeric,
+  alamat text,
+  courier text,
+  payment_method text,
+  proof_image_url text,
+  resi_number text,
+  status text DEFAULT 'Menunggu Pembayaran',
+  items jsonb,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Tambah kolom jika tabel transaksi sudah ada tapi belum ada kolom alamat/resi
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS alamat text;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS courier text;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS payment_method text;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS proof_image_url text;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS resi_number text;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS items jsonb;
+
+-- 3. Kebijakan RLS (Row Level Security) untuk Tabel Users & Transactions
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
--- 3. Drop policy lama jika ada
-DROP POLICY IF EXISTS "Users can insert their own data" ON public.users;
-DROP POLICY IF EXISTS "Users can read all users" ON public.users;
-DROP POLICY IF EXISTS "Users can update their own data" ON public.users;
-DROP POLICY IF EXISTS "Service role full access" ON public.users;
+DROP POLICY IF EXISTS "Allow all for users" ON public.users;
+CREATE POLICY "Allow all for users" ON public.users FOR ALL USING (true) WITH CHECK (true);
 
--- 4. Policy: User bisa INSERT data diri sendiri saat signup
-CREATE POLICY "Users can insert their own data"
-  ON public.users
-  FOR INSERT
-  WITH CHECK (auth.uid() = id);
+DROP POLICY IF EXISTS "Allow all for transactions" ON public.transactions;
+CREATE POLICY "Allow all for transactions" ON public.transactions FOR ALL USING (true) WITH CHECK (true);
 
--- 5. Policy: Semua authenticated user bisa READ tabel users
-CREATE POLICY "Users can read all users"
-  ON public.users
-  FOR SELECT
-  USING (true);
+-- 4. Grant Akses Anon & Authenticated
+GRANT ALL ON public.users TO anon, authenticated;
+GRANT ALL ON public.transactions TO anon, authenticated;
 
--- 6. Policy: User hanya bisa UPDATE data diri sendiri
-CREATE POLICY "Users can update their own data"
-  ON public.users
-  FOR UPDATE
-  USING (auth.uid() = id);
+-- 5. Setup Storage Bucket payment_proofs
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('payment_proofs', 'payment_proofs', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
 
--- 7. Grant akses ke anon & authenticated
-GRANT SELECT, INSERT, UPDATE ON public.users TO anon;
-GRANT SELECT, INSERT, UPDATE ON public.users TO authenticated;
+DROP POLICY IF EXISTS "Public Upload Payment Proofs" ON storage.objects;
+CREATE POLICY "Public Upload Payment Proofs" ON storage.objects
+  FOR ALL USING (bucket_id = 'payment_proofs') WITH CHECK (bucket_id = 'payment_proofs');
