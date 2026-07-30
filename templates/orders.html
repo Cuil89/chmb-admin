@@ -45,6 +45,7 @@
           {% set s = order.status %}
           <span class="badge-status
             {% if s == 'Menunggu Pembayaran' or s == 'Pending' %}badge-pending
+            {% elif 'Verifikasi' in s %}bg-warning text-dark fw-bold
             {% elif s == 'Diproses' %}badge-diproses
             {% elif s == 'Dikirim' %}badge-dikirim
             {% elif s == 'Dibatalkan' %}bg-danger text-white
@@ -53,8 +54,8 @@
         <td class="text-center">
           <form method="POST" action="{{ url_for('update_order_status', order_id=order.id) }}" class="d-flex gap-2 justify-content-center">
             <select name="status" class="form-select form-select-sm rounded-3"
-              style="background:#222; border-color:#333; color:#fff; font-size:0.8rem; width:150px;">
-              {% for status in ['Menunggu Pembayaran', 'Diproses', 'Dikirim', 'Selesai', 'Dibatalkan'] %}
+              style="background:#222; border-color:#333; color:#fff; font-size:0.8rem; width:170px;">
+              {% for status in ['Menunggu Pembayaran', 'Menunggu Verifikasi Admin', 'Diproses', 'Dikirim', 'Selesai', 'Dibatalkan'] %}
                 <option value="{{ status }}" {{ 'selected' if order.status == status else '' }}>{{ status }}</option>
               {% endfor %}
             </select>
@@ -71,6 +72,9 @@
       </td></tr>
       {% endfor %}
     </tbody>
+  </table>
+</div>
+
 <!-- MODAL BUKTI BAYAR -->
 <div class="modal fade" id="proofModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
@@ -80,11 +84,20 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body text-center p-3">
-        <img id="modalProofImg" src="" style="max-width:100%; max-height:450px; border-radius:12px; border:1px solid #333;">
+        <img id="modalProofImg" src="" style="max-width:100%; max-height:420px; border-radius:12px; border:1px solid #333;">
       </div>
       <div class="modal-footer border-secondary justify-content-between">
         <span id="modalOrderInfo" class="text-secondary" style="font-size:0.8rem; font-family:monospace;"></span>
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Tutup</button>
+        <div class="d-flex gap-2">
+          <form id="rejectForm" method="POST" action="">
+            <input type="hidden" name="status" value="Dibatalkan">
+            <button type="submit" class="btn btn-outline-danger btn-sm">Tolak Pembayaran</button>
+          </form>
+          <form id="approveForm" method="POST" action="">
+            <input type="hidden" name="status" value="Diproses">
+            <button type="submit" class="btn btn-success btn-sm fw-bold"><i class="bi bi-check-circle me-1"></i>Terima & Proses</button>
+          </form>
+        </div>
       </div>
     </div>
   </div>
@@ -94,6 +107,9 @@
 function showProofModal(imgUrl, orderId) {
   document.getElementById('modalProofImg').src = imgUrl;
   document.getElementById('modalOrderInfo').textContent = 'Order ID: ' + orderId;
+  var actionUrl = '/orders/update-status/' + orderId;
+  document.getElementById('rejectForm').action = actionUrl;
+  document.getElementById('approveForm').action = actionUrl;
   new bootstrap.Modal(document.getElementById('proofModal')).show();
 }
 </script>
