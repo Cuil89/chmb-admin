@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   created_at timestamptz DEFAULT now()
 );
 
--- Tambah kolom jika tabel transaksi sudah ada tapi belum ada kolom alamat/resi
+-- Tambah kolom jika tabel transaksi sudah ada tapi belum ada kolom-kolomnya
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS total_harga numeric;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS alamat text;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS courier text;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS payment_method text;
